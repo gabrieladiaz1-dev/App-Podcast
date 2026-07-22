@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="violet_primary">#FF532680</color>
+    <color name="violet_dark">#FF3D1A5E</color>
+    <color name="violet_light">#FFE8DDF7</color>
+    <color name="violet_soft">#FFF3EEFB</color>
+    <color name="purple">#FF2D0A4A</color>
+    <color name="purple_dark">#FF2D0A4A</color>
+    <color name="purple_light">#FFF3E5F5</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+</resources>

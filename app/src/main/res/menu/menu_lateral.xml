@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_inicio"
+        android:icon="@drawable/ic_home"
+        android:title="@string/drawer_inicio" />
+    <item
+        android:id="@+id/nav_favoritos"
+        android:icon="@drawable/ic_favorite"
+        android:title="@string/drawer_favoritos" />
+    <item
+        android:id="@+id/nav_listas"
+        android:icon="@drawable/ic_playlist"
+        android:title="@string/drawer_listas" />
+    <item
+        android:id="@+id/nav_borradores"
+        android:icon="@drawable/ic_draft"
+        android:title="@string/drawer_borradores" />
+    <item
+        android:id="@+id/divider"
+        android:enabled="false"
+        android:title="">
+        <menu>
+            <item
+                android:enabled="false"
+                android:title="" />
+        </menu>
+    </item>
+    <item
+        android:id="@+id/nav_cerrar_sesion"
+        android:icon="@drawable/ic_logout"
+        android:title="@string/drawer_cerrar_sesion" />
+</menu>

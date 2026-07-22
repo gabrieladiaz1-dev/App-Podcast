@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Audify</string>
+    <string name="login_greeting">Hola, inicia sesi\u00f3n</string>
+    <string name="email_placeholder">Correo</string>
+    <string name="password_placeholder">Contrase\u00f1a</string>
+    <string name="forgot_password">\u00bfOlvidaste tu contrase\u00f1a?</string>
+    <string name="btn_sign_in">INICIAR SESI\u00d3N</string>
+    <string name="no_account_text">\u00bfNo tienes cuenta?</string>
+    <string name="register_link">Reg\u00edstrate</string>
+    <string name="register_title">Crea tu cuenta</string>
+    <string name="full_name_placeholder">Nombre completo</string>
+    <string name="email_or_phone_placeholder">Correo electr\u00f3nico o tel\u00e9fono</string>
+    <string name="confirm_password_placeholder">Confirmar contrase\u00f1a</string>
+    <string name="btn_register">REGISTRARME</string>
+    <string name="has_account_text">\u00bfYa tienes cuenta?</string>
+    <string name="login_link">Inicia sesi\u00f3n</string>
+    <string name="login_skip">Omitir inicio de sesi\u00f3n</string>
+    <string name="home_greeting">Hola</string>
+    <string name="home_welcome">Bienvenido</string>
+    <string name="home_search_hint">Buscar podcasts\u2026</string>
+    <string name="home_populares">Populares</string>
+    <string name="menu_desc">Men\u00fa</string>
+    <string name="banner_desc">Banner</string>
+    <string name="filter_desc">Filtrar</string>
+    <string name="notification_desc">Notificaci\u00f3n</string>
+    <string name="profile_title">Mi Perfil</string>
+    <string name="profile_user_name">Usuario Audify</string>
+    <string name="profile_user_email">usuario@audify.com</string>
+    <string name="profile_name_label">Nombre</string>
+    <string name="profile_name_hint">Escribe tu nombre</string>
+    <string name="profile_new_password">Nueva Contrase\u00f1a</string>
+    <string name="profile_password_hint">M\u00ednimo 6 caracteres</string>
+    <string name="profile_confirm_password">Confirmar Contrase\u00f1a</string>
+    <string name="profile_confirm_hint">Repite la contrase\u00f1a</string>
+    <string name="profile_save">Guardar Cambios</string>
+    <string name="profile_logout">Cerrar Sesi\u00f3n</string>
+    <string name="back_desc">Regresar</string>
+    <string name="bottom_inicio">Inicio</string>
+    <string name="bottom_podcasts">Mis podcasts</string>
+    <string name="bottom_upload">Subir podcast</string>
+    <string name="bottom_profile">Mi perfil</string>
+    <!-- Drawer -->
+    <string name="drawer_user_name">Usuario Audify</string>
+    <string name="drawer_user_email">usuario@audify.com</string>
+    <string name="drawer_inicio">Inicio</string>
+    <string name="drawer_favoritos">Mis favoritos</string>
+    <string name="drawer_listas">Mis listas</string>
+    <string name="drawer_borradores">Borradores</string>
+    <string name="drawer_cerrar_sesion">Cerrar sesi\u00f3n</string>
+
+    <string name="notif_coming_soon">Pr\u00f3ximamente</string>
+    <string name="filter_title">Filtrar</string>
+    <string name="thumbnail_desc">Thumbnail</string>
+</resources>

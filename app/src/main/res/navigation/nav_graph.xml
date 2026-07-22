@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/inicioFragment">
+
+    <fragment
+        android:id="@+id/inicioFragment"
+        android:name="com.example.audify.ui.inicio.InicioFragment"
+        android:label="@string/bottom_inicio"
+        tools:layout="@layout/fragment_inicio" />
+
+    <fragment
+        android:id="@+id/podcastsFragment"
+        android:name="com.example.audify.ui.podcasts.PodcastsFragment"
+        android:label="@string/bottom_podcasts"
+        tools:layout="@layout/fragment_podcasts" />
+
+    <fragment
+        android:id="@+id/uploadFragment"
+        android:name="com.example.audify.ui.upload.UploadFragment"
+        android:label="@string/bottom_upload"
+        tools:layout="@layout/fragment_upload" />
+
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.example.audify.ui.profile.ProfileFragment"
+        android:label="@string/bottom_profile"
+        tools:layout="@layout/fragment_profile" />
+
+</navigation>
