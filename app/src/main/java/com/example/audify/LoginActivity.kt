@@ -61,6 +61,8 @@ class LoginActivity : AppCompatActivity() {
                     SupabaseService.loginUser(email, password)
                         .onSuccess {
                             Toast.makeText(this@LoginActivity, "Inicio de sesi\u00f3n exitoso", Toast.LENGTH_SHORT).show()
+                            startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                            finish()
                         }
                         .onFailure { error ->
                             Toast.makeText(this@LoginActivity, "Error: ${error.message}", Toast.LENGTH_LONG).show()

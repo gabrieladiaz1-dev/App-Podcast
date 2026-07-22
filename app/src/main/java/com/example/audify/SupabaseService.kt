@@ -40,12 +40,89 @@ object SupabaseService {
     suspend fun registerUser(
         email: String,
         password: String
-    ): Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<String> = withContext(Dispatchers.IO) {
         try {
             client.auth.signUpWith(Email) {
                 this.email = email
                 this.password = password
             }
+            val userId = client.auth.currentUserOrNull()?.id
+                ?: error("No se pudo obtener el ID del usuario")
+            Result.success(userId)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createProfile(userId: String, name: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            client.postgrest["profiles"].insert(
+                mapOf("id" to userId, "name" to name)
+            )
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ──── perfil del usuario ────
+
+    data class Profile(
+        val id: String = "",
+        val name: String = "",
+        val avatar_url: String? = null,
+        val created_at: String? = null
+    )
+
+    suspend fun getCurrentUserEmail(): String? {
+        return client.auth.currentUserOrNull()?.email
+    }
+
+    suspend fun getProfile(): Profile = withContext(Dispatchers.IO) {
+        val user = client.auth.currentUserOrNull() ?: error("Usuario no autenticado")
+        val defaultName = user.email?.substringBefore("@") ?: "Usuario"
+        try {
+            val profiles = client.postgrest["profiles"]
+                .select {
+                    filter { eq("id", user.id) }
+                }
+                .decodeList<Profile>()
+            val existing = profiles.firstOrNull()
+            if (existing != null && existing.name.isNotEmpty()) return@withContext existing
+            if (existing != null) {
+                client.postgrest["profiles"].update(
+                    mapOf("name" to defaultName)
+                ) { filter { eq("id", user.id) } }
+            } else {
+                client.postgrest["profiles"].insert(
+                    mapOf("id" to user.id, "name" to defaultName)
+                )
+            }
+            Profile(id = user.id, name = defaultName)
+        } catch (e: Exception) {
+            Profile(id = user.id, name = defaultName)
+        }
+    }
+
+    suspend fun updateProfileName(name: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val userId = client.auth.currentUserOrNull()?.id ?: error("Usuario no autenticado")
+            client.postgrest["profiles"].update(
+                mapOf("name" to name)
+            ) {
+                filter {
+                    eq("id", userId)
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun signOut(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            client.auth.signOut()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -63,6 +140,7 @@ object SupabaseService {
                 this.email = email
                 this.password = password
             }
+            getProfile()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

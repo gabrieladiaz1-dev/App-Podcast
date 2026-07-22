@@ -84,7 +84,8 @@ class RegisterActivity : AppCompatActivity() {
                 binding.btnRegister.isEnabled = false
                 lifecycleScope.launch {
                     SupabaseService.registerUser(email, password)
-                        .onSuccess {
+                        .onSuccess { userId ->
+                            SupabaseService.createProfile(userId, name)
                             Toast.makeText(this@RegisterActivity, "Cuenta creada exitosamente", Toast.LENGTH_SHORT).show()
                             startActivity(Intent(this@RegisterActivity, LoginActivity::class.java))
                             finish()
