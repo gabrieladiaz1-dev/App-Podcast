@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
             when (item.itemId) {
                 R.id.nav_inicio -> navController.navigate(R.id.inicioFragment)
                 R.id.nav_favoritos -> Toast.makeText(this, R.string.drawer_favoritos, Toast.LENGTH_SHORT).show()
-                R.id.nav_listas -> Toast.makeText(this, R.string.drawer_listas, Toast.LENGTH_SHORT).show()
+                R.id.nav_listas -> navController.navigate(R.id.listsFragment)
                 R.id.nav_borradores -> Toast.makeText(this, R.string.drawer_borradores, Toast.LENGTH_SHORT).show()
                 R.id.nav_cerrar_sesion -> {
                     val intent = Intent(this, LoginActivity::class.java)

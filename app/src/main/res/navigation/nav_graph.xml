@@ -29,4 +29,10 @@
         android:label="@string/bottom_profile"
         tools:layout="@layout/fragment_profile" />
 
+    <fragment
+        android:id="@+id/listsFragment"
+        android:name="com.example.audify.ui.lists.ListsFragment"
+        android:label="@string/drawer_listas"
+        tools:layout="@layout/fragment_lists" />
+
 </navigation>

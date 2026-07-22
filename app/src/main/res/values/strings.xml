@@ -49,6 +49,18 @@
     <string name="drawer_borradores">Borradores</string>
     <string name="drawer_cerrar_sesion">Cerrar sesi\u00f3n</string>
 
+    <!-- Podcasts -->
+    <string name="podcasts_creator_subtitle">Creadora de contenido</string>
+    <string name="podcasts_count_label">Podcasts</string>
+    <string name="podcasts_categories_label">Categor\u00edas</string>
+    <string name="podcasts_categories_title">Categor\u00edas</string>
+
+    <!-- Lists -->
+    <string name="lists_total_label">Listas creadas</string>
+    <string name="lists_create">+ Crear lista</string>
+    <string name="lists_section">Mis listas</string>
+    <string name="lists_all_podcasts">Todos los podcasts</string>
+
     <string name="notif_coming_soon">Pr\u00f3ximamente</string>
     <string name="filter_title">Filtrar</string>
     <string name="thumbnail_desc">Thumbnail</string>
