@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.navigation.Navigation
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.R
@@ -72,7 +73,12 @@ class PodcastsFragment : Fragment() {
         val userPodcasts = MockData.getUserPodcasts()
         binding.txtSectionTitle.text = getString(R.string.bottom_podcasts) + " (${userPodcasts.size})"
         binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvUserPodcasts.adapter = PodcastAdapter(userPodcasts)
+        binding.rvUserPodcasts.adapter = PodcastAdapter(userPodcasts, ::openDetail)
+    }
+
+    private fun openDetail(podcast: com.example.audify.model.Podcast) {
+        val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
+        Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
     }
 
     override fun onDestroyView() {

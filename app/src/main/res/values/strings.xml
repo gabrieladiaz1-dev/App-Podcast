@@ -61,6 +61,13 @@
     <string name="lists_section">Mis listas</string>
     <string name="lists_all_podcasts">Todos los podcasts</string>
 
+    <!-- Favorites -->
+    <string name="fav_count_label">Podcasts favoritos</string>
+    <string name="fav_section_title">Mis favoritos</string>
+    <string name="fav_search_hint">Buscar en favoritos\u2026</string>
+    <string name="detail_title">Reproduciendo</string>
+    <string name="detail_description_label">Descripci\u00f3n</string>
+
     <string name="notif_coming_soon">Pr\u00f3ximamente</string>
     <string name="filter_title">Filtrar</string>
     <string name="thumbnail_desc">Thumbnail</string>

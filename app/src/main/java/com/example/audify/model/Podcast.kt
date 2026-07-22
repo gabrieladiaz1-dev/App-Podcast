@@ -6,5 +6,6 @@ data class Podcast(
     val author: String,
     val description: String,
     val duration: String,
-    val category: String = "General"
+    val category: String = "General",
+    val audioUrl: String = ""
 )

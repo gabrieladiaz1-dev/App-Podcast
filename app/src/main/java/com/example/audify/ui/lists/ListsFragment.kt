@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.R
 import com.example.audify.data.MockData
@@ -59,7 +60,12 @@ class ListsFragment : Fragment() {
 
     private fun setupAllPodcasts() {
         binding.rvAllPodcasts.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvAllPodcasts.adapter = PodcastAdapter(MockData.getPodcasts())
+        binding.rvAllPodcasts.adapter = PodcastAdapter(MockData.getPodcasts(), ::openDetail)
+    }
+
+    private fun openDetail(podcast: com.example.audify.model.Podcast) {
+        val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
+        Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
     }
 
     private fun setupCreateList() {
@@ -135,11 +141,11 @@ class ListsFragment : Fragment() {
             .setItems(categories) { _, which ->
                 val cat = categories[which]
                 val filtered = MockData.getPodcasts().filter { it.category == cat }
-                binding.rvAllPodcasts.adapter = PodcastAdapter(filtered)
+                binding.rvAllPodcasts.adapter = PodcastAdapter(filtered, ::openDetail)
                 Toast.makeText(requireContext(), "Filtrando: $cat", Toast.LENGTH_SHORT).show()
             }
             .setPositiveButton("Mostrar todos") { _, _ ->
-                binding.rvAllPodcasts.adapter = PodcastAdapter(MockData.getPodcasts())
+                binding.rvAllPodcasts.adapter = PodcastAdapter(MockData.getPodcasts(), ::openDetail)
             }
             .show()
     }

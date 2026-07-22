@@ -35,4 +35,21 @@
         android:label="@string/drawer_listas"
         tools:layout="@layout/fragment_lists" />
 
+    <fragment
+        android:id="@+id/favoritesFragment"
+        android:name="com.example.audify.ui.favorites.FavoritesFragment"
+        android:label="@string/drawer_favoritos"
+        tools:layout="@layout/fragment_favorites" />
+
+    <fragment
+        android:id="@+id/detailFragment"
+        android:name="com.example.audify.ui.detail.DetailFragment"
+        android:label="@string/detail_title"
+        tools:layout="@layout/fragment_detail">
+
+        <argument
+            android:name="podcastId"
+            app:argType="integer" />
+    </fragment>
+
 </navigation>

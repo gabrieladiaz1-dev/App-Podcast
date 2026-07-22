@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.R
 import com.example.audify.data.MockData
@@ -46,14 +47,19 @@ class InicioFragment : Fragment() {
             false
         }
         binding.rvPodcasts.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvPodcasts.adapter = PodcastAdapter(MockData.getPodcasts())
+        binding.rvPodcasts.adapter = PodcastAdapter(MockData.getPodcasts(), ::openDetail)
         binding.swipeLayout.setOnRefreshListener {
-            binding.rvPodcasts.adapter = PodcastAdapter(MockData.getPodcasts())
+            binding.rvPodcasts.adapter = PodcastAdapter(MockData.getPodcasts(), ::openDetail)
             binding.swipeLayout.isRefreshing = false
         }
         binding.btnFiltro.setOnClickListener {
             Toast.makeText(requireContext(), R.string.filter_title, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun openDetail(podcast: com.example.audify.model.Podcast) {
+        val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
+        Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
     }
 
     override fun onDestroyView() {
