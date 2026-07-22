@@ -71,4 +71,30 @@
     <string name="notif_coming_soon">Pr\u00f3ximamente</string>
     <string name="filter_title">Filtrar</string>
     <string name="thumbnail_desc">Thumbnail</string>
+
+    <!-- Upload -->
+    <string name="upload_title">Subir podcast</string>
+    <string name="upload_cover_label">Portada</string>
+    <string name="upload_cover_hint">Toca para agregar una imagen de portada</string>
+    <string name="upload_title_hint">T\u00edtulo del podcast</string>
+    <string name="upload_desc_hint">Descripci\u00f3n</string>
+    <string name="upload_category_label">Categor\u00eda</string>
+    <string name="upload_select_category">Selecciona una categor\u00eda</string>
+    <string name="upload_audio_label">Audio</string>
+    <string name="upload_select_file">Seleccionar archivo</string>
+    <string name="upload_record">Grabar audio</string>
+    <string name="upload_file_selected">Archivo seleccionado: %s</string>
+    <string name="upload_recording">Grabando\u2026</string>
+    <string name="upload_stop">Detener</string>
+    <string name="upload_publish">Publicar podcast</string>
+    <string name="upload_note">Los archivos de audio se revisar\u00e1n para verificar que cumplan con fines acad\u00e9micos antes de su publicaci\u00f3n.</string>
+    <string name="upload_dialog_title">Podcast enviado</string>
+    <string name="upload_dialog_message">Tu podcast ha sido recibido. El audio estar\u00e1 en revisi\u00f3n para comprobar que cumple con fines acad\u00e9micos.\n\nMientras tanto, el podcast ser\u00e1 visible en tu perfil pero el audio no podr\u00e1 reproducirse hasta que sea aprobado por un administrador.</string>
+    <string name="upload_dialog_ok">Entendido</string>
+    <string name="upload_category_dialog_title">Seleccionar categor\u00eda</string>
+    <string name="upload_audio_required">Selecciona o graba un audio antes de publicar</string>
+    <string name="upload_title_required">Escribe un t\u00edtulo para el podcast</string>
+    <string name="upload_desc_required">Escribe una descripci\u00f3n</string>
+    <string name="upload_permission_denied">Permiso denegado. Revisa la configuraci\u00f3n de la app.</string>
+    <string name="upload_recording_error">Error al iniciar la grabaci\u00f3n</string>
 </resources>
