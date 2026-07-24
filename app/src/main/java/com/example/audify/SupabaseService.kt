@@ -74,10 +74,10 @@ object SupabaseService {
         }
     }
 
-    suspend fun createProfile(userId: String, name: String, username: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun createProfile(userId: String, name: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             client.postgrest["profiles"].insert(
-                mapOf("id" to userId, "name" to name, "username" to username)
+                mapOf("id" to userId, "name" to name)
             )
             Result.success(Unit)
         } catch (e: Exception) {
@@ -106,7 +106,6 @@ object SupabaseService {
     suspend fun getProfile(): Profile = withContext(Dispatchers.IO) {
         val user = client.auth.currentUserOrNull() ?: error("Usuario no autenticado")
         val defaultName = user.email?.substringBefore("@") ?: "Usuario"
-        val defaultUsername = user.email?.substringBefore("@") ?: "usuario"
         try {
             val profiles = client.postgrest["profiles"]
                 .select {
@@ -116,17 +115,17 @@ object SupabaseService {
             val existing = profiles.firstOrNull()
             if (existing != null && existing.name.isNotEmpty()) return@withContext existing
             if (existing != null) {
-                val updates = mutableMapOf<String, String>("name" to defaultName)
-                if (existing.username.isEmpty()) updates["username"] = defaultUsername
-                client.postgrest["profiles"].update(updates) { filter { eq("id", user.id) } }
+                client.postgrest["profiles"].update(
+                    mapOf("name" to defaultName)
+                ) { filter { eq("id", user.id) } }
             } else {
                 client.postgrest["profiles"].insert(
-                    mapOf("id" to user.id, "name" to defaultName, "username" to defaultUsername)
+                    mapOf("id" to user.id, "name" to defaultName)
                 )
             }
-            Profile(id = user.id, name = defaultName, username = defaultUsername)
+            Profile(id = user.id, name = defaultName)
         } catch (e: Exception) {
-            Profile(id = user.id, name = defaultName, username = defaultUsername)
+            Profile(id = user.id, name = defaultName)
         }
     }
 

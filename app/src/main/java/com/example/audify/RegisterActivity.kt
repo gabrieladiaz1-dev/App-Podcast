@@ -17,7 +17,6 @@ class RegisterActivity : AppCompatActivity() {
     private var isConfirmVisible = false
 
     private var pendingName = ""
-    private var pendingUsername = ""
     private var pendingEmail = ""
     private var pendingPassword = ""
 
@@ -56,7 +55,6 @@ class RegisterActivity : AppCompatActivity() {
 
         binding.btnRegister.setOnClickListener {
             val name = binding.etFullName.text.toString().trim()
-            val username = binding.etUsername.text.toString().trim()
             val email = binding.etEmailOrPhone.text.toString().trim()
             val password = binding.etPassword.text.toString().trim()
             val confirmPassword = binding.etConfirmPassword.text.toString().trim()
@@ -66,18 +64,6 @@ class RegisterActivity : AppCompatActivity() {
             if (name.isEmpty()) {
                 Toast.makeText(this, "Ingresa tu nombre completo", Toast.LENGTH_SHORT).show()
                 binding.etFullName.requestFocus()
-                hasError = true
-            } else if (username.isEmpty()) {
-                Toast.makeText(this, "Ingresa un nombre de usuario", Toast.LENGTH_SHORT).show()
-                binding.etUsername.requestFocus()
-                hasError = true
-            } else if (username.length < 3) {
-                Toast.makeText(this, "El nombre de usuario debe tener al menos 3 caracteres", Toast.LENGTH_SHORT).show()
-                binding.etUsername.requestFocus()
-                hasError = true
-            } else if (!username.matches(Regex("^[a-zA-Z0-9._]+$"))) {
-                Toast.makeText(this, "El nombre de usuario solo puede contener letras, n\u00fameros, puntos y guiones bajos", Toast.LENGTH_SHORT).show()
-                binding.etUsername.requestFocus()
                 hasError = true
             } else if (email.isEmpty()) {
                 Toast.makeText(this, "Ingresa tu correo electr\u00f3nico", Toast.LENGTH_SHORT).show()
@@ -107,7 +93,6 @@ class RegisterActivity : AppCompatActivity() {
 
             if (!hasError) {
                 pendingName = name
-                pendingUsername = username
                 pendingEmail = email
                 pendingPassword = password
                 showConfirmationDialog()
@@ -135,19 +120,9 @@ class RegisterActivity : AppCompatActivity() {
         binding.btnRegister.isEnabled = false
         binding.btnRegister.text = "Registrando..."
         lifecycleScope.launch {
-            val available = SupabaseService.isUsernameAvailable(pendingUsername)
-                .getOrNull() ?: true
-            if (!available) {
-                binding.btnRegister.isEnabled = true
-                binding.btnRegister.text = getString(R.string.btn_register)
-                Toast.makeText(this@RegisterActivity, "Ese nombre de usuario ya est\u00e1 en uso", Toast.LENGTH_SHORT).show()
-                binding.etUsername.requestFocus()
-                return@launch
-            }
-
             SupabaseService.registerUser(pendingEmail, pendingPassword)
                 .onSuccess { userId ->
-                    SupabaseService.createProfile(userId, pendingName, pendingUsername)
+                    SupabaseService.createProfile(userId, pendingName)
                     Toast.makeText(this@RegisterActivity, "Cuenta creada exitosamente", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this@RegisterActivity, LoginActivity::class.java))
                     finish()
