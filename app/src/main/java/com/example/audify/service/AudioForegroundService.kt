@@ -8,10 +8,12 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Binder
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.audify.MainActivity
@@ -40,6 +42,8 @@ class AudioForegroundService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var audioManager: AudioManager? = null
+    private var powerManager: PowerManager? = null
+    private var proximityWakeLock: PowerManager.WakeLock? = null
     private var currentTitle = ""
     private var currentUrl = ""
     private var useEarpiece = false
@@ -70,6 +74,7 @@ class AudioForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         createNotificationChannel()
         isServiceRunning = true
         Log.d(TAG, "Service created")
@@ -188,29 +193,54 @@ class AudioForegroundService : Service() {
     fun setEarpieceMode(useEarpiece: Boolean) {
         if (useEarpiece == this.useEarpiece) return
         this.useEarpiece = useEarpiece
-        val am = audioManager ?: return
         if (useEarpiece) {
-            am.isSpeakerphoneOn = false
-            am.mode = AudioManager.MODE_IN_COMMUNICATION
-            Log.d(TAG, "Switched to earpiece")
+            val am = audioManager ?: return
+            val devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            val earpiece = devices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE }
+            if (earpiece != null) {
+                mediaPlayer?.setPreferredDevice(earpiece)
+                Log.d(TAG, "Routed audio to earpiece")
+            } else {
+                Log.w(TAG, "Earpiece device not found")
+            }
+            acquireProximityWakeLock()
         } else {
-            am.mode = AudioManager.MODE_NORMAL
-            am.isSpeakerphoneOn = true
-            Log.d(TAG, "Switched to speaker")
+            mediaPlayer?.setPreferredDevice(null)
+            releaseProximityWakeLock()
+            Log.d(TAG, "Routed audio to speaker")
+        }
+    }
+
+    private fun acquireProximityWakeLock() {
+        if (proximityWakeLock == null) {
+            proximityWakeLock = powerManager?.newWakeLock(
+                PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK,
+                "Audify:Proximity"
+            )
+        }
+        if (proximityWakeLock?.isHeld == false) {
+            proximityWakeLock?.acquire()
+            Log.d(TAG, "Proximity wake lock acquired")
+        }
+    }
+
+    private fun releaseProximityWakeLock() {
+        if (proximityWakeLock?.isHeld == true) {
+            proximityWakeLock?.release()
+            Log.d(TAG, "Proximity wake lock released")
         }
     }
 
     fun stop() {
+        mediaPlayer?.setPreferredDevice(null)
         mediaPlayer?.release()
         mediaPlayer = null
         currentUrl = ""
         currentTitle = ""
         hasStartedForeground = false
+        releaseProximityWakeLock()
+        proximityWakeLock = null
         isServiceRunning = false
-        audioManager?.let {
-            it.mode = AudioManager.MODE_NORMAL
-            it.isSpeakerphoneOn = true
-        }
         Log.d(TAG, "Service stopped")
     }
 
