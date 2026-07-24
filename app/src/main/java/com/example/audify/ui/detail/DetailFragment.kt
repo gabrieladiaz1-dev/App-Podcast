@@ -23,8 +23,6 @@ import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentDetailBinding
 import com.example.audify.model.Podcast
 import com.example.audify.service.AudioForegroundService
-import com.example.audify.service.ProximitySensorManager
-import com.example.audify.service.ShakeDetector
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -44,9 +42,6 @@ class DetailFragment : Fragment() {
     private var service: AudioForegroundService? = null
     private var isBound = false
     private val handler = Handler(Looper.getMainLooper())
-
-    private lateinit var proximitySensor: ProximitySensorManager
-    private lateinit var shakeDetector: ShakeDetector
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -90,9 +85,6 @@ class DetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        proximitySensor = ProximitySensorManager(requireContext())
-        shakeDetector = ShakeDetector(requireContext())
-
         val podcastId = arguments?.getInt("podcastId", -1) ?: -1
         if (podcastId == -1) {
             Toast.makeText(requireContext(), "No encontramos ese podcast", Toast.LENGTH_SHORT).show()
@@ -114,7 +106,6 @@ class DetailFragment : Fragment() {
             bindPodcast()
             setupClickListeners()
             bindAudioService()
-            startSensors()
         }
     }
 
@@ -268,35 +259,6 @@ class DetailFragment : Fragment() {
         }
     }
 
-    private fun startSensors() {
-        proximitySensor.onNear = {
-            handler.post {
-                Log.d(TAG, "Near detected → earpiece")
-                service?.setEarpieceMode(true)
-            }
-        }
-        proximitySensor.onFar = {
-            handler.post {
-                Log.d(TAG, "Far detected → speaker")
-                service?.setEarpieceMode(false)
-            }
-        }
-        proximitySensor.start()
-
-        shakeDetector.onDoubleShake = {
-            handler.post {
-                Log.d(TAG, "Double shake → toggle play/pause")
-                togglePlayPause()
-            }
-        }
-        shakeDetector.start()
-    }
-
-    private fun stopSensors() {
-        proximitySensor.stop()
-        shakeDetector.stop()
-    }
-
     private fun formatTime(millis: Int): String {
         val fmt = SimpleDateFormat("mm:ss", Locale.getDefault())
         fmt.timeZone = TimeZone.getTimeZone("UTC")
@@ -305,22 +267,17 @@ class DetailFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        if (::proximitySensor.isInitialized) proximitySensor.start()
-        if (::shakeDetector.isInitialized) shakeDetector.start()
         updatePlayPauseButton()
         if (service?.isPlaying == true) handler.post(updateSeekBar)
     }
 
     override fun onPause() {
         super.onPause()
-        if (::proximitySensor.isInitialized) proximitySensor.stop()
-        if (::shakeDetector.isInitialized) shakeDetector.stop()
         handler.removeCallbacks(updateSeekBar)
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        stopSensors()
         handler.removeCallbacks(updateSeekBar)
         if (isBound) {
             requireContext().unbindService(serviceConnection)

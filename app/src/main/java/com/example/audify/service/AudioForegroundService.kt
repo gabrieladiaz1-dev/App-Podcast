@@ -15,6 +15,8 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import com.example.audify.service.ProximitySensorManager
+import com.example.audify.service.ShakeDetector
 import androidx.core.app.NotificationCompat
 import com.example.audify.MainActivity
 import com.example.audify.R
@@ -44,6 +46,8 @@ class AudioForegroundService : Service() {
     private var audioManager: AudioManager? = null
     private var powerManager: PowerManager? = null
     private var proximityWakeLock: PowerManager.WakeLock? = null
+    private var proximitySensor: ProximitySensorManager? = null
+    private var shakeDetector: ShakeDetector? = null
     private var currentTitle = ""
     private var currentUrl = ""
     private var useEarpiece = false
@@ -133,6 +137,7 @@ class AudioForegroundService : Service() {
                 startForeground(NOTIFICATION_ID, buildNotification())
                 hasStartedForeground = true
 
+                startSensors()
                 mp.start()
                 onPreparedListener?.invoke(mp.duration)
                 onPlayStateChanged?.invoke(true)
@@ -227,7 +232,30 @@ class AudioForegroundService : Service() {
         }
     }
 
+    private fun startSensors() {
+        if (proximitySensor != null) return
+        proximitySensor = ProximitySensorManager(this).apply {
+            onNear = { setEarpieceMode(true) }
+            onFar = { setEarpieceMode(false) }
+            start()
+        }
+        shakeDetector = ShakeDetector(this).apply {
+            onDoubleShake = { togglePlayPause() }
+            start()
+        }
+        Log.d(TAG, "Sensors started")
+    }
+
+    private fun stopSensors() {
+        proximitySensor?.stop()
+        proximitySensor = null
+        shakeDetector?.stop()
+        shakeDetector = null
+        Log.d(TAG, "Sensors stopped")
+    }
+
     fun stop() {
+        stopSensors()
         mediaPlayer?.release()
         mediaPlayer = null
         currentUrl = ""
