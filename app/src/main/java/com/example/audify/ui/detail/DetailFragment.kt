@@ -125,16 +125,25 @@ class DetailFragment : Fragment() {
                 return@setOnClickListener
             }
             val podcastIdStr = p.supabaseId
+            binding.btnFavorite.isEnabled = false
             lifecycleScope.launch {
                 val isFav = SupabaseService.isFavorited(userId, podcastIdStr)
-                if (isFav) {
+                val result = if (isFav) {
                     SupabaseService.removeFavorite(userId, podcastIdStr)
-                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
                 } else {
                     SupabaseService.addFavorite(
                         SupabaseService.Favorite(user_id = userId, podcast_id = podcastIdStr)
                     )
-                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
+                }
+                binding.btnFavorite.isEnabled = true
+                if (result.isSuccess) {
+                    if (isFav) {
+                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                    } else {
+                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
+                    }
+                } else {
+                    Toast.makeText(requireContext(), "No pudimos actualizar el favorito. Intenta de nuevo", Toast.LENGTH_SHORT).show()
                 }
             }
         }

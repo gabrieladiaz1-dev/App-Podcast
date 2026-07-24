@@ -88,22 +88,33 @@ class PodcastAdapter(
                 binding.btnFavorite.setOnClickListener {
                     val userId = SessionManager.getUserId() ?: return@setOnClickListener
                     val podcastIdStr = podcast.supabaseId
-                    if (isFav) {
-                        favoriteIds.remove(podcastIdStr)
-                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
-                        CoroutineScope(Dispatchers.IO).launch {
+                    binding.btnFavorite.isEnabled = false
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val currentlyFav = SupabaseService.isFavorited(userId, podcastIdStr)
+                        val result = if (currentlyFav) {
                             SupabaseService.removeFavorite(userId, podcastIdStr)
-                        }
-                    } else {
-                        favoriteIds.add(podcastIdStr)
-                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
-                        CoroutineScope(Dispatchers.IO).launch {
+                        } else {
                             SupabaseService.addFavorite(
-                                SupabaseService.Favorite(
-                                    user_id = userId,
-                                    podcast_id = podcastIdStr
-                                )
+                                SupabaseService.Favorite(user_id = userId, podcast_id = podcastIdStr)
                             )
+                        }
+                        CoroutineScope(Dispatchers.Main).launch {
+                            binding.btnFavorite.isEnabled = true
+                            if (result.isSuccess) {
+                                if (currentlyFav) {
+                                    favoriteIds.remove(podcastIdStr)
+                                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                                } else {
+                                    favoriteIds.add(podcastIdStr)
+                                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
+                                }
+                            } else {
+                                Toast.makeText(
+                                    binding.root.context,
+                                    "No pudimos actualizar el favorito. Intenta de nuevo",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     }
                     onFavoriteClick?.invoke(podcast)

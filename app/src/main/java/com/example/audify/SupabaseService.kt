@@ -345,16 +345,19 @@ object SupabaseService {
     }
 
     data class Favorite(
+        val id: String? = null,
         val user_id: String = "",
         val podcast_id: String = "",
-        val created_at: String = ""
+        val created_at: String? = null
     )
 
     suspend fun addFavorite(favorite: Favorite): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             client.postgrest["favorites"].insert(favorite)
+            Log.d("SupabaseService", "Favorito agregado: user=${favorite.user_id} podcast=${favorite.podcast_id}")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("SupabaseService", "Error agregando favorito: ${e.message}", e)
             Result.failure(wrapJwtError(e))
         }
     }
@@ -367,8 +370,10 @@ object SupabaseService {
                     eq("podcast_id", podcastId)
                 }
             }
+            Log.d("SupabaseService", "Favorito eliminado: user=$userId podcast=$podcastId")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("SupabaseService", "Error eliminando favorito: ${e.message}", e)
             Result.failure(wrapJwtError(e))
         }
     }
@@ -383,8 +388,10 @@ object SupabaseService {
                     }
                 }
                 .decodeList<Favorite>()
+            Log.d("SupabaseService", "isFavorited check: user=$userId podcast=$podcastId result=${result.isNotEmpty()}")
             result.isNotEmpty()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "Error consultando favorito: ${e.message}", e)
             false
         }
     }
@@ -394,10 +401,12 @@ object SupabaseService {
             val favs = client.postgrest["favorites"]
                 .select { filter { eq("user_id", userId) } }
                 .decodeList<Favorite>()
+            Log.d("SupabaseService", "getFavoritePodcasts: user=$userId found ${favs.size} favorites")
             if (favs.isEmpty()) return@withContext Result.success(emptyList())
             val podcasts = mutableListOf<com.example.audify.model.Podcast>()
             for (fav in favs) {
                 try {
+                    Log.d("SupabaseService", "Buscando podcast id=${fav.podcast_id}")
                     val list = client.postgrest["podcasts"]
                         .select {
                             filter {
@@ -406,15 +415,20 @@ object SupabaseService {
                             }
                         }
                         .decodeList<PodcastSupabase>()
+                    Log.d("SupabaseService", "Podcast id=${fav.podcast_id} encontrado: ${list.isNotEmpty()}")
                     if (list.isNotEmpty()) {
                         val ps = list.first()
                         val profile = getProfileByUserId(ps.user_id)
                         podcasts.add(ps.toModel().copy(author = profile?.name ?: "Desconocido"))
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    Log.e("SupabaseService", "Error cargando podcast favorito ${fav.podcast_id}: ${e.message}")
+                }
             }
+            Log.d("SupabaseService", "Total favoritos cargados: ${podcasts.size}")
             Result.success(podcasts)
         } catch (e: Exception) {
+            Log.e("SupabaseService", "Error en getFavoritePodcasts: ${e.message}", e)
             Result.failure(wrapJwtError(e))
         }
     }
