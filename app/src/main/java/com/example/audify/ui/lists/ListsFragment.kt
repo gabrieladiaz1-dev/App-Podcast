@@ -74,7 +74,7 @@ class ListsFragment : Fragment() {
     private fun setupCreateList() {
         binding.btnCreateList.setOnClickListener {
             if (!SessionManager.isLoggedIn()) {
-                Toast.makeText(requireContext(), "Inicia sesi\u00f3n para crear listas", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Ingresa para crear listas", Toast.LENGTH_SHORT).show()
                 startActivity(Intent(requireContext(), LoginActivity::class.java))
                 return@setOnClickListener
             }
@@ -97,9 +97,9 @@ class ListsFragment : Fragment() {
                 if (name.isNotEmpty()) {
                     MockData.createPlaylist(name)
                     refreshPlaylists()
-                    Toast.makeText(requireContext(), "Lista \"$name\" creada", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "\u00a1Lista \"$name\" creada!", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(requireContext(), "Escribe un nombre", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "¿Cómo se llama tu lista?", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -118,7 +118,7 @@ class ListsFragment : Fragment() {
             .setMessage(content)
             .setPositiveButton("A\u00f1adir podcast") { _, _ ->
                 if (!SessionManager.isLoggedIn()) {
-                    Toast.makeText(requireContext(), "Inicia sesi\u00f3n para modificar listas", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Ingresa para modificar tus listas", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(requireContext(), LoginActivity::class.java))
                     return@setPositiveButton
                 }
@@ -145,7 +145,7 @@ class ListsFragment : Fragment() {
             }
             .setPositiveButton("Listo") { _, _ ->
                 refreshPlaylists()
-                Toast.makeText(requireContext(), "Lista actualizada", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "\u00a1Lista actualizada!", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancelar", null)
             .show()
@@ -159,7 +159,7 @@ class ListsFragment : Fragment() {
                 val cat = categories[which]
                 val filtered = MockData.getPodcasts().filter { it.category == cat }
                 binding.rvAllPodcasts.adapter = PodcastAdapter(filtered, ::openDetail)
-                Toast.makeText(requireContext(), "Filtrando: $cat", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Mostrando: $cat", Toast.LENGTH_SHORT).show()
             }
             .setPositiveButton("Mostrar todos") { _, _ ->
                 binding.rvAllPodcasts.adapter = PodcastAdapter(MockData.getPodcasts(), ::openDetail)

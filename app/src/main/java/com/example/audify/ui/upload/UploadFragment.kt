@@ -125,7 +125,6 @@ class UploadFragment : Fragment() {
 
         DraftsManager.init(requireContext())
         setupListeners()
-        loadCategoriesFromSupabase()
         loadDraftIfPresent()
     }
 
@@ -133,7 +132,7 @@ class UploadFragment : Fragment() {
         binding.cardCover.setOnClickListener { pickImage() }
         binding.btnSelectFile.setOnClickListener { pickAudio() }
         binding.btnRecord.setOnClickListener { requestRecordPermission() }
-        binding.cardCategory.setOnClickListener { showCategoryDialog() }
+        binding.cardCategory.setOnClickListener { loadAndShowCategories() }
         binding.btnPublish.setOnClickListener { attemptPublish() }
         binding.btnSaveDraft.setOnClickListener { saveDraft() }
         binding.btnPlayPauseAudio.setOnClickListener { togglePlayback() }
@@ -166,15 +165,30 @@ class UploadFragment : Fragment() {
         }
     }
 
-    private fun loadCategoriesFromSupabase() {
+    private fun loadAndShowCategories() {
+        if (categoriesLoaded.isNotEmpty()) {
+            showCategoryDialog()
+            return
+        }
+        val progressDialog = AlertDialog.Builder(requireContext())
+            .setTitle("Cargando...")
+            .setMessage("Estamos buscando las categorías, un segundito")
+            .setCancelable(false)
+            .show()
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 SupabaseService.getCategories()
             }
+            progressDialog.dismiss()
             if (result.isSuccess) {
                 categoriesLoaded = result.getOrNull() ?: emptyList()
+                if (categoriesLoaded.isNotEmpty()) {
+                    showCategoryDialog()
+                } else {
+                    Toast.makeText(requireContext(), "No se encontraron categorías. Revisa tu conexión", Toast.LENGTH_LONG).show()
+                }
             } else {
-                categoriesLoaded = emptyList()
+                Toast.makeText(requireContext(), "No pudimos cargar las categorías. ¿Tienes internet?", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -356,11 +370,6 @@ class UploadFragment : Fragment() {
     }
 
     private fun showCategoryDialog() {
-        if (categoriesLoaded.isEmpty()) {
-            Toast.makeText(requireContext(), "Cargando categorías...", Toast.LENGTH_SHORT).show()
-            loadCategoriesFromSupabase()
-            return
-        }
         val categoryNames = categoriesLoaded.map { it.name }.toTypedArray()
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.upload_category_dialog_title)
@@ -418,7 +427,7 @@ class UploadFragment : Fragment() {
     private fun publishToSupabase() {
         val userId = SessionManager.getUserId()
         if (userId.isNullOrEmpty()) {
-            Toast.makeText(requireContext(), "Error: sesión no válida", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Parece que no has iniciado sesión. Ingresa de nuevo", Toast.LENGTH_LONG).show()
             return
         }
         val title = binding.edtTitle.text.toString().trim()
@@ -443,14 +452,14 @@ class UploadFragment : Fragment() {
                     val ex = audioResult.exceptionOrNull()
                     val msg = when {
                         ex?.message?.contains("RLS", true) == true ->
-                            "Error de permisos (RLS): verifica que la política del bucket 'priv' permita subir archivos a usuarios autenticados."
+                            "No tienes permiso para subir archivos. Revisa la configuración de tu cuenta"
                         ex?.message?.contains("row-level security", true) == true ->
-                            "Error RLS: la política del bucket 'priv' bloquea la subida. Configura una política INSERT en Supabase Storage."
+                            "Tu cuenta no tiene permisos para subir archivos. Contacta al administrador"
                         ex?.message?.contains("timed out", true) == true || ex?.message?.contains("timeout", true) == true ->
-                            "Tiempo de conexión agotado. Verifica tu conexión a internet e intenta de nuevo."
+                            "Se tardó demasiado la conexión. ¿Tienes internet? Intenta de nuevo"
                         ex?.message?.contains("host", true) == true || ex?.message?.contains("resolve", true) == true ->
-                            "No se pudo conectar a Supabase. Verifica tu conexión a internet."
-                        else -> "Error al subir el audio: ${ex?.message ?: "Error desconocido"}"
+                            "No pudimos conectarnos. Revisa tu internet y vuelve a intentar"
+                        else -> "No pudimos subir el audio. Intenta de nuevo"
                     }
                     showError(msg)
                     return@launch
@@ -497,18 +506,18 @@ class UploadFragment : Fragment() {
                     val ex = insertResult.exceptionOrNull()
                     val msg = when {
                         ex?.message?.contains("RLS", true) == true || ex?.message?.contains("row-level security", true) == true ->
-                            "Error de permisos (RLS): verifica que la tabla 'podcasts' tenga una política INSERT para usuarios autenticados."
+                            "No tienes permiso para publicar podcasts. Revisa tu cuenta"
                         ex?.message?.contains("duplicate", true) == true ->
-                            "Ya existe un podcast con estos datos."
+                            "Ya publicaste algo similar. ¿Querías subir otro?"
                         ex?.message?.contains("foreign key", true) == true || ex?.message?.contains("violates", true) == true ->
-                            "Error de integridad: verifica que la categoría seleccionada sea válida."
-                        else -> "Error al guardar el podcast: ${ex?.message ?: "Error desconocido"}"
+                            "Algo falló con la categoría seleccionada. Prueba elegir otra"
+                        else -> "No pudimos guardar tu podcast. Intenta de nuevo"
                     }
                     showError(msg)
                 }
             } catch (e: Exception) {
                 setLoading(false)
-                showError("Error inesperado: ${e.message}")
+                showError("Algo salió mal inesperadamente. No te preocupes, no se guardó nada raro")
             }
         }
     }
@@ -585,19 +594,19 @@ class UploadFragment : Fragment() {
 
     private fun showError(message: String) {
         AlertDialog.Builder(requireContext())
-            .setTitle("Error")
+            .setTitle("Ups, algo falló")
             .setIcon(R.drawable.ic_error)
             .setMessage(message)
-            .setPositiveButton("Reintentar") { _, _ -> publishToSupabase() }
+            .setPositiveButton("Intentar otra vez") { _, _ -> publishToSupabase() }
             .setNegativeButton("Cancelar") { _, _ -> resetForm() }
             .show()
     }
 
     private fun showSuccessAndNavigate() {
         AlertDialog.Builder(requireContext())
-            .setTitle("Podcast enviado")
+            .setTitle("¡Listo!")
             .setIcon(R.drawable.ic_check_circle)
-            .setMessage("Tu podcast ha sido enviado para revisión. Podrás verlo una vez sea aprobado por un administrador.")
+            .setMessage("Tu podcast ya está en revisión. Pronto podrás verlo en tu perfil")
             .setPositiveButton("Ver mi perfil") { _, _ ->
                 resetForm()
                 try {

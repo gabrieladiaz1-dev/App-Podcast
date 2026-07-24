@@ -55,7 +55,7 @@ class PodcastAdapter(
                 binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
                 binding.btnFavorite.alpha = 0.4f
                 binding.btnFavorite.setOnClickListener {
-                    Toast.makeText(binding.root.context, "Inicia sesi\u00f3n para agregar favoritos", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(binding.root.context, "Ingresa para guardar favoritos", Toast.LENGTH_SHORT).show()
                     binding.root.context.startActivity(Intent(binding.root.context, LoginActivity::class.java))
                 }
             }

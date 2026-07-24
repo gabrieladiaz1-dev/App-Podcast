@@ -62,31 +62,31 @@ class RegisterActivity : AppCompatActivity() {
             var hasError = false
 
             if (name.isEmpty()) {
-                Toast.makeText(this, "Ingresa tu nombre completo", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "¿Cómo te llamas? Deja tu nombre completo", Toast.LENGTH_SHORT).show()
                 binding.etFullName.requestFocus()
                 hasError = true
             } else if (email.isEmpty()) {
-                Toast.makeText(this, "Ingresa tu correo electr\u00f3nico", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "¿Cuál es tu correo? Lo necesitamos para tu cuenta", Toast.LENGTH_SHORT).show()
                 binding.etEmailOrPhone.requestFocus()
                 hasError = true
             } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                Toast.makeText(this, "Ingresa un correo electr\u00f3nico v\u00e1lido", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Ese correo no parece válido. ¿Lo escribiste bien?", Toast.LENGTH_SHORT).show()
                 binding.etEmailOrPhone.requestFocus()
                 hasError = true
             } else if (password.isEmpty()) {
-                Toast.makeText(this, "Crea una contrase\u00f1a", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Crea una contraseña para proteger tu cuenta", Toast.LENGTH_SHORT).show()
                 binding.etPassword.requestFocus()
                 hasError = true
             } else if (password.length < 6) {
-                Toast.makeText(this, "La contrase\u00f1a debe tener al menos 6 caracteres", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Tu contraseña debe tener al menos 6 letras o números", Toast.LENGTH_SHORT).show()
                 binding.etPassword.requestFocus()
                 hasError = true
             } else if (confirmPassword.isEmpty()) {
-                Toast.makeText(this, "Confirma tu contrase\u00f1a", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Escribe tu contraseña otra vez para confirmar", Toast.LENGTH_SHORT).show()
                 binding.etConfirmPassword.requestFocus()
                 hasError = true
             } else if (password != confirmPassword) {
-                Toast.makeText(this, "Las contrase\u00f1as no coinciden", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Las contraseñas no coinciden. Revísalas", Toast.LENGTH_SHORT).show()
                 binding.etConfirmPassword.requestFocus()
                 hasError = true
             }
@@ -118,19 +118,27 @@ class RegisterActivity : AppCompatActivity() {
 
     private fun registerWithSupabase() {
         binding.btnRegister.isEnabled = false
-        binding.btnRegister.text = "Registrando..."
+        binding.btnRegister.text = "Creando tu cuenta..."
         lifecycleScope.launch {
             SupabaseService.registerUser(pendingEmail, pendingPassword)
                 .onSuccess { userId ->
                     SupabaseService.createProfile(userId, pendingName)
-                    Toast.makeText(this@RegisterActivity, "Cuenta creada exitosamente", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@RegisterActivity, "¡Tu cuenta está lista! Ya puedes ingresar", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this@RegisterActivity, LoginActivity::class.java))
                     finish()
                 }
                 .onFailure { error ->
                     binding.btnRegister.isEnabled = true
                     binding.btnRegister.text = getString(R.string.btn_register)
-                    Toast.makeText(this@RegisterActivity, "Error: ${error.message}", Toast.LENGTH_LONG).show()
+                    val msg = error.message ?: ""
+                    val friendlyMsg = when {
+                        msg.contains("already", true) || msg.contains("registered", true) ->
+                            "Ese correo ya tiene una cuenta. ¿Querías ingresar?"
+                        msg.contains("password", true) ->
+                            "Hubo un problema con la contraseña. Asegúrate de que tenga al menos 6 caracteres"
+                        else -> "No pudimos crear tu cuenta. Intenta de nuevo"
+                    }
+                    Toast.makeText(this@RegisterActivity, friendlyMsg, Toast.LENGTH_LONG).show()
                 }
         }
     }

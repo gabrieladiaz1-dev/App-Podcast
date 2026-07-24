@@ -48,7 +48,7 @@ class UserProfileFragment : Fragment() {
             binding.progressBar.visibility = View.GONE
 
             if (profile == null) {
-                Toast.makeText(requireContext(), "Usuario no encontrado", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "No encontramos a ese usuario", Toast.LENGTH_SHORT).show()
                 return@launch
             }
 

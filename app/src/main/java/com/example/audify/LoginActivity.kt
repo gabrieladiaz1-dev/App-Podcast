@@ -52,16 +52,16 @@ class LoginActivity : AppCompatActivity() {
 
             if (email.isEmpty()) {
                 binding.etEmail.requestFocus()
-                Toast.makeText(this, "Ingresa tu correo electr\u00f3nico", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Escribe tu correo para poder ingresar", Toast.LENGTH_SHORT).show()
                 hasError = true
             } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                Toast.makeText(this, "Correo electr\u00f3nico inv\u00e1lido", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Ese correo no se ve bien. ¿Lo escribiste completo?", Toast.LENGTH_SHORT).show()
                 binding.etEmail.requestFocus()
                 hasError = true
             }
 
             if (!hasError && password.isEmpty()) {
-                Toast.makeText(this, "Ingresa tu contrase\u00f1a", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "¿Y tu contraseña? No la dejaste", Toast.LENGTH_SHORT).show()
                 binding.etPassword.requestFocus()
                 hasError = true
             }
@@ -76,15 +76,14 @@ class LoginActivity : AppCompatActivity() {
                         }
                         .onFailure { error ->
                             setLoadingState(false)
-                            val msg = error.message ?: "Error desconocido"
-                            Toast.makeText(this@LoginActivity, "Error: $msg", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@LoginActivity, "No pudimos ingresar. ¿Correo o contraseña incorrectos?", Toast.LENGTH_LONG).show()
                         }
                 }
             }
         }
 
         binding.tvForgotPassword.setOnClickListener {
-            Toast.makeText(this, "Te enviaremos un enlace para restablecer tu contrase\u00f1a", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Próximamente podrás recuperar tu contraseña desde aquí", Toast.LENGTH_LONG).show()
         }
 
         binding.tvCreateAccount.setOnClickListener {
@@ -103,6 +102,6 @@ class LoginActivity : AppCompatActivity() {
 
     private fun setLoadingState(loading: Boolean) {
         binding.btnSignIn.isEnabled = !loading
-        binding.btnSignIn.text = if (loading) "Ingresando..." else getString(R.string.btn_sign_in)
+        binding.btnSignIn.text = if (loading) "Entrando..." else getString(R.string.btn_sign_in)
     }
 }

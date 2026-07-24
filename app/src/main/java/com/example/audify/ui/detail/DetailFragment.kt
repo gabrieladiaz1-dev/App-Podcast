@@ -59,7 +59,7 @@ class DetailFragment : Fragment() {
         val podcastId = arguments?.getInt("podcastId", -1) ?: -1
         podcast = MockData.getPodcasts().find { it.id == podcastId }
         if (podcast == null) {
-            Toast.makeText(requireContext(), "Podcast no encontrado", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "No encontramos ese podcast", Toast.LENGTH_SHORT).show()
             requireActivity().onBackPressedDispatcher.onBackPressed()
             return
         }
@@ -141,14 +141,14 @@ class DetailFragment : Fragment() {
                 prepareAsync()
             }
         } catch (e: Exception) {
-            Toast.makeText(requireContext(), "Error al cargar audio", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "No pudimos cargar el audio. Intenta de nuevo", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun togglePlayPause() {
         val mp = mediaPlayer
         if (mp == null || !isPrepared) {
-            Toast.makeText(requireContext(), "Cargando audio...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Un segundito, estamos preparando el audio", Toast.LENGTH_SHORT).show()
             return
         }
         if (isPlaying) {

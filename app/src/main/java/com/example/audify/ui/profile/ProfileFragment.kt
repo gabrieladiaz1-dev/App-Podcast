@@ -75,30 +75,28 @@ class ProfileFragment : Fragment() {
             val confirmPassword = binding.edtConfirmPassword.text.toString().trim()
 
             if (name.isEmpty()) {
-                Toast.makeText(requireContext(), "El nombre no puede estar vac\u00edo", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "\u00bf C\u00f3mo te llamas? Deja tu nombre para guardar", Toast.LENGTH_SHORT).show()
                 binding.edtNombre.requestFocus()
                 return@setOnClickListener
             }
 
             if (password.isNotEmpty() && password.length < 6) {
-                Toast.makeText(requireContext(), "La contrase\u00f1a debe tener al menos 6 caracteres", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Tu contrase\u00f1a nueva debe tener al menos 6 caracteres", Toast.LENGTH_SHORT).show()
                 binding.edtPassword.requestFocus()
                 return@setOnClickListener
             }
 
             if (password != confirmPassword) {
-                Toast.makeText(requireContext(), "Las contrase\u00f1as no coinciden", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Las contrase\u00f1as no coinciden. Rev\u00edsalas", Toast.LENGTH_SHORT).show()
                 binding.edtConfirmPassword.requestFocus()
                 return@setOnClickListener
             }
 
             lifecycleScope.launch {
                 var success = true
-                var errorMsg = ""
 
                 SupabaseService.updateProfileName(name).onFailure {
                     success = false
-                    errorMsg = it.message ?: "Error al guardar nombre"
                 }
 
                 if (success) {
@@ -106,9 +104,9 @@ class ProfileFragment : Fragment() {
                     binding.txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
                     binding.edtPassword.text.clear()
                     binding.edtConfirmPassword.text.clear()
-                    Toast.makeText(requireContext(), "Cambios guardados", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "\u00a1Listo! Tus cambios se guardaron", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(requireContext(), "Error: $errorMsg", Toast.LENGTH_LONG).show()
+                    Toast.makeText(requireContext(), "No pudimos guardar los cambios. Intenta de nuevo", Toast.LENGTH_LONG).show()
                 }
             }
         }
