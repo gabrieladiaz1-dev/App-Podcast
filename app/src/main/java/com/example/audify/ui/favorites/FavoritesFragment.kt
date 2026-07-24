@@ -78,6 +78,13 @@ class FavoritesFragment : Fragment() {
         })
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (SessionManager.isLoggedIn()) {
+            loadFavorites()
+        }
+    }
+
     private fun loadFavorites() {
         val userId = SessionManager.getUserId() ?: return
         lifecycleScope.launch {

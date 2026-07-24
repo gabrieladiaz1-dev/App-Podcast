@@ -1,9 +1,13 @@
 package com.example.audify.ui.detail
 
-import android.media.MediaPlayer
+import android.content.ComponentName
+import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,12 +15,16 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.Navigation
+import coil.load
+import coil.transform.RoundedCornersTransformation
 import com.example.audify.R
 import com.example.audify.SessionManager
 import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentDetailBinding
 import com.example.audify.model.Podcast
+import com.example.audify.service.AudioForegroundService
+import com.example.audify.service.ProximitySensorManager
+import com.example.audify.service.ShakeDetector
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -25,24 +33,46 @@ import java.util.TimeZone
 
 class DetailFragment : Fragment() {
 
+    companion object {
+        private const val TAG = "DetailFragment"
+    }
+
     private var _binding: FragmentDetailBinding? = null
     private val binding get() = _binding!!
 
-    private var mediaPlayer: MediaPlayer? = null
-    private var isPlaying = false
-    private var isPrepared = false
-    private val handler = Handler(Looper.getMainLooper())
     private var podcast: Podcast? = null
+    private var service: AudioForegroundService? = null
+    private var isBound = false
+    private val handler = Handler(Looper.getMainLooper())
+
+    private lateinit var proximitySensor: ProximitySensorManager
+    private lateinit var shakeDetector: ShakeDetector
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+            val localBinder = binder as AudioForegroundService.LocalBinder
+            service = localBinder.getService()
+            isBound = true
+            Log.d(TAG, "Service connected")
+            setupServiceCallbacks()
+            updatePlayPauseButton()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            service = null
+            isBound = false
+        }
+    }
 
     private val updateSeekBar = object : Runnable {
         override fun run() {
-            mediaPlayer?.let { mp ->
-                if (mp.isPlaying) {
-                    val current = mp.currentPosition
+            service?.let { svc ->
+                if (svc.isPlaying) {
+                    val current = svc.currentPosition
                     binding.txtCurrentTime.text = formatTime(current)
                     binding.seekBar.progress = current
-                    binding.seekBar.max = mp.duration
-                    binding.txtTotalTime.text = formatTime(mp.duration)
+                    binding.seekBar.max = svc.duration
+                    binding.txtTotalTime.text = formatTime(svc.duration)
                     handler.postDelayed(this, 200)
                 }
             }
@@ -59,6 +89,9 @@ class DetailFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        proximitySensor = ProximitySensorManager(requireContext())
+        shakeDetector = ShakeDetector(requireContext())
 
         val podcastId = arguments?.getInt("podcastId", -1) ?: -1
         if (podcastId == -1) {
@@ -80,8 +113,41 @@ class DetailFragment : Fragment() {
 
             bindPodcast()
             setupClickListeners()
-            initMediaPlayer()
+            bindAudioService()
+            startSensors()
         }
+    }
+
+    private fun setupServiceCallbacks() {
+        service?.onPreparedListener = { _ ->
+            handler.post {
+                updatePlayPauseButton()
+                handler.post(updateSeekBar)
+            }
+        }
+        service?.onCompletionListener = {
+            handler.post {
+                binding.btnPlayPause.setImageResource(R.drawable.ic_play)
+                binding.seekBar.progress = 0
+                binding.txtCurrentTime.text = "00:00"
+            }
+        }
+        service?.onPlayStateChanged = { playing ->
+            handler.post {
+                updatePlayPauseButton()
+                if (playing) handler.post(updateSeekBar) else handler.removeCallbacks(updateSeekBar)
+            }
+        }
+        service?.onErrorListener = { msg ->
+            handler.post {
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun updatePlayPauseButton() {
+        val playing = service?.isPlaying == true
+        binding.btnPlayPause.setImageResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play)
     }
 
     private fun bindPodcast() {
@@ -92,10 +158,19 @@ class DetailFragment : Fragment() {
         binding.txtCategory.text = p.category.ifEmpty { "General" }
         binding.txtDescription.text = p.description
 
+        if (!p.coverUrl.isNullOrEmpty()) {
+            binding.ivCover.load(p.coverUrl) {
+                crossfade(true)
+                placeholder(R.drawable.bg_circle_violet)
+                error(R.drawable.bg_circle_violet)
+                transformations(RoundedCornersTransformation(24f))
+            }
+        }
+
         val userId = SessionManager.getUserId()
         if (userId != null) {
             lifecycleScope.launch {
-                val isFav = SupabaseService.isFavorited(userId, p.id.toString())
+                val isFav = SupabaseService.isFavorited(userId, p.supabaseId)
                 binding.btnFavorite.setImageResource(
                     if (isFav) R.drawable.ic_favorite else R.drawable.ic_favorite_border
                 )
@@ -105,15 +180,7 @@ class DetailFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.btnBack.setOnClickListener {
-            Navigation.findNavController(requireView()).popBackStack()
-        }
-
-        binding.txtAuthor.setOnClickListener {
-            val p = podcast ?: return@setOnClickListener
-            if (p.userId.isNotEmpty()) {
-                val bundle = Bundle().apply { putString("userId", p.userId) }
-                Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
-            }
+            requireActivity().onBackPressedDispatcher.onBackPressed()
         }
 
         binding.btnFavorite.setOnClickListener {
@@ -122,29 +189,38 @@ class DetailFragment : Fragment() {
                 Toast.makeText(requireContext(), "Ingresa para guardar favoritos", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val podcastIdStr = p.id.toString()
+            val podcastIdStr = p.supabaseId
+            binding.btnFavorite.isEnabled = false
             lifecycleScope.launch {
                 val isFav = SupabaseService.isFavorited(userId, podcastIdStr)
-                if (isFav) {
+                val result = if (isFav) {
                     SupabaseService.removeFavorite(userId, podcastIdStr)
-                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
                 } else {
                     SupabaseService.addFavorite(
                         SupabaseService.Favorite(user_id = userId, podcast_id = podcastIdStr)
                     )
-                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
+                }
+                binding.btnFavorite.isEnabled = true
+                if (result.isSuccess) {
+                    if (isFav) {
+                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                    } else {
+                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
+                    }
+                } else {
+                    Toast.makeText(requireContext(), "No pudimos actualizar el favorito. Intenta de nuevo", Toast.LENGTH_SHORT).show()
                 }
             }
         }
 
         binding.btnPlayPause.setOnClickListener { togglePlayPause() }
-        binding.btnRewind.setOnClickListener { seekRelative(-10000) }
-        binding.btnForward.setOnClickListener { seekRelative(10000) }
+        binding.btnRewind.setOnClickListener { service?.seekRelative(-10000) }
+        binding.btnForward.setOnClickListener { service?.seekRelative(10000) }
 
         binding.seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser && mediaPlayer != null) {
-                    mediaPlayer?.seekTo(progress)
+                if (fromUser) {
+                    service?.seekTo(progress)
                     binding.txtCurrentTime.text = formatTime(progress)
                 }
             }
@@ -153,64 +229,66 @@ class DetailFragment : Fragment() {
         })
     }
 
-    private fun initMediaPlayer() {
-        val url = podcast?.audioUrl ?: return
+    private fun bindAudioService() {
+        val p = podcast ?: return
+        val url = p.audioUrl
         if (url.isEmpty()) {
             Toast.makeText(requireContext(), "Este podcast no tiene audio disponible", Toast.LENGTH_SHORT).show()
             return
         }
 
-        try {
-            mediaPlayer = MediaPlayer().apply {
-                setDataSource(url)
-                setOnPreparedListener { mp ->
-                    this@DetailFragment.isPrepared = true
-                    binding.seekBar.max = mp.duration
-                    binding.txtTotalTime.text = formatTime(mp.duration)
-                }
-                setOnCompletionListener {
-                    this@DetailFragment.isPlaying = false
-                    binding.btnPlayPause.setImageResource(R.drawable.ic_play)
-                    binding.seekBar.progress = 0
-                    binding.txtCurrentTime.text = "00:00"
-                }
-                setOnErrorListener { _, _, _ ->
-                    this@DetailFragment.isPrepared = false
-                    binding.btnPlayPause.setImageResource(R.drawable.ic_play)
-                    true
-                }
-                prepareAsync()
+        Log.d(TAG, "bindAudioService: audioUrl=$url approved=${p.approved}")
+        lifecycleScope.launch {
+            val resolvedUrl = SupabaseService.resolveAudioUrl(url, p.approved)
+            Log.d(TAG, "resolveAudioUrl result: $resolvedUrl")
+            if (resolvedUrl == null) {
+                Toast.makeText(requireContext(), "Este podcast está en revisión y aún no puede escucharse", Toast.LENGTH_LONG).show()
+                binding.btnPlayPause.visibility = View.GONE
+                binding.btnRewind.visibility = View.GONE
+                binding.btnForward.visibility = View.GONE
+                binding.seekBar.visibility = View.GONE
+                binding.txtCurrentTime.visibility = View.GONE
+                binding.txtTotalTime.visibility = View.GONE
+                return@launch
             }
-        } catch (e: Exception) {
-            Toast.makeText(requireContext(), "No pudimos cargar el audio. Intenta de nuevo", Toast.LENGTH_SHORT).show()
+
+            val intent = Intent(requireContext(), AudioForegroundService::class.java).apply {
+                action = AudioForegroundService.ACTION_PLAY
+                putExtra(AudioForegroundService.EXTRA_URL, resolvedUrl)
+                putExtra(AudioForegroundService.EXTRA_TITLE, p.title)
+            }
+            requireContext().startForegroundService(intent)
+            requireContext().bindService(intent, serviceConnection, 0)
         }
     }
 
     private fun togglePlayPause() {
-        val mp = mediaPlayer
-        if (mp == null || !isPrepared) {
-            Toast.makeText(requireContext(), "Un segundito, estamos preparando el audio", Toast.LENGTH_SHORT).show()
-            return
+        if (isBound) {
+            service?.togglePlayPause()
         }
-        if (isPlaying) {
-            mp.pause()
-            binding.btnPlayPause.setImageResource(R.drawable.ic_play)
-            handler.removeCallbacks(updateSeekBar)
-        } else {
-            mp.start()
-            binding.btnPlayPause.setImageResource(R.drawable.ic_pause)
-            handler.post(updateSeekBar)
-        }
-        isPlaying = !isPlaying
     }
 
-    private fun seekRelative(millis: Int) {
-        mediaPlayer?.let { mp ->
-            val newPos = (mp.currentPosition + millis).coerceIn(0, mp.duration)
-            mp.seekTo(newPos)
-            binding.txtCurrentTime.text = formatTime(newPos)
-            binding.seekBar.progress = newPos
+    private fun startSensors() {
+        proximitySensor.onNear = {
+            Log.d(TAG, "Near detected → earpiece")
+            service?.setEarpieceMode(true)
         }
+        proximitySensor.onFar = {
+            Log.d(TAG, "Far detected → speaker")
+            service?.setEarpieceMode(false)
+        }
+        proximitySensor.start()
+
+        shakeDetector.onDoubleShake = {
+            Log.d(TAG, "Double shake → toggle play/pause")
+            handler.post { togglePlayPause() }
+        }
+        shakeDetector.start()
+    }
+
+    private fun stopSensors() {
+        proximitySensor.stop()
+        shakeDetector.stop()
     }
 
     private fun formatTime(millis: Int): String {
@@ -219,13 +297,30 @@ class DetailFragment : Fragment() {
         return fmt.format(Date(millis.toLong()))
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::proximitySensor.isInitialized) proximitySensor.start()
+        if (::shakeDetector.isInitialized) shakeDetector.start()
+        updatePlayPauseButton()
+        if (service?.isPlaying == true) handler.post(updateSeekBar)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (::proximitySensor.isInitialized) proximitySensor.stop()
+        if (::shakeDetector.isInitialized) shakeDetector.stop()
+        handler.removeCallbacks(updateSeekBar)
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
+        stopSensors()
         handler.removeCallbacks(updateSeekBar)
-        mediaPlayer?.release()
-        mediaPlayer = null
-        isPrepared = false
-        isPlaying = false
+        if (isBound) {
+            requireContext().unbindService(serviceConnection)
+            isBound = false
+        }
+        service = null
         _binding = null
     }
 }

@@ -499,6 +499,14 @@ class UploadFragment : Fragment() {
                     showError("No pudimos subir tu audio. Detalle: $rawError")
                     return@launch
                 }
+                withContext(Dispatchers.IO) {
+                    try {
+                        SupabaseService.uploadAudio(bucketName = "pod", path = audioPath, audioBytes = audioBytes)
+                        Log.d("UploadFragment", "Audio copiado a pod/$audioPath")
+                    } catch (e: Exception) {
+                        Log.e("UploadFragment", "No se pudo copiar a pod: ${e.message}")
+                    }
+                }
                 val audioUrl = withContext(Dispatchers.IO) {
                     SupabaseService.getPublicAudioUrl("priv", audioPath)
                 }

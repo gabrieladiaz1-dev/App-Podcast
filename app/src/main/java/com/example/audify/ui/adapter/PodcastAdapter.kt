@@ -5,6 +5,8 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import coil.transform.CircleCropTransformation
 import com.example.audify.LoginActivity
 import com.example.audify.R
 import com.example.audify.SessionManager
@@ -32,8 +34,8 @@ class PodcastAdapter(
         CoroutineScope(Dispatchers.IO).launch {
             for (podcast in items) {
                 try {
-                    val isFav = SupabaseService.isFavorited(userId, podcast.id.toString())
-                    if (isFav) favoriteIds.add(podcast.id.toString())
+                    val isFav = SupabaseService.isFavorited(userId, podcast.supabaseId)
+                    if (isFav) favoriteIds.add(podcast.supabaseId)
                 } catch (_: Exception) {}
             }
             CoroutineScope(Dispatchers.Main).launch {
@@ -59,38 +61,67 @@ class PodcastAdapter(
             binding.tvAuthor.text = podcast.author
             binding.tvDescription.text = podcast.description
 
-            if (podcast.duration.isNotEmpty()) {
+            if (!podcast.coverUrl.isNullOrEmpty()) {
+                binding.ivThumbnail.load(podcast.coverUrl) {
+                    crossfade(true)
+                    placeholder(R.drawable.bg_circle_violet)
+                    error(R.drawable.ic_audify_logo)
+                    transformations(CircleCropTransformation())
+                }
+            } else {
+                binding.ivThumbnail.setImageResource(R.drawable.ic_audify_logo)
+            }
+
+            if (!podcast.approved) {
+                binding.tvDuration.text = "En revisión"
+                binding.tvDuration.visibility = android.view.View.VISIBLE
+                binding.tvDuration.setTextColor(0xFFD32F2F.toInt())
+                binding.tvDuration.setBackgroundResource(R.drawable.bg_pill_pending)
+            } else if (podcast.duration.isNotEmpty()) {
                 binding.tvDuration.text = podcast.duration
                 binding.tvDuration.visibility = android.view.View.VISIBLE
+                binding.tvDuration.setTextColor(binding.root.context.getColor(R.color.purple))
+                binding.tvDuration.setBackgroundResource(R.drawable.bg_pill)
             } else {
                 binding.tvDuration.visibility = android.view.View.GONE
             }
 
             if (SessionManager.isLoggedIn()) {
-                val isFav = favoriteIds.contains(podcast.id.toString())
+                val isFav = favoriteIds.contains(podcast.supabaseId)
                 binding.btnFavorite.setImageResource(
                     if (isFav) R.drawable.ic_favorite
                     else R.drawable.ic_favorite_border
                 )
                 binding.btnFavorite.setOnClickListener {
                     val userId = SessionManager.getUserId() ?: return@setOnClickListener
-                    val podcastIdStr = podcast.id.toString()
-                    if (isFav) {
-                        favoriteIds.remove(podcastIdStr)
-                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
-                        CoroutineScope(Dispatchers.IO).launch {
+                    val podcastIdStr = podcast.supabaseId
+                    binding.btnFavorite.isEnabled = false
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val currentlyFav = SupabaseService.isFavorited(userId, podcastIdStr)
+                        val result = if (currentlyFav) {
                             SupabaseService.removeFavorite(userId, podcastIdStr)
-                        }
-                    } else {
-                        favoriteIds.add(podcastIdStr)
-                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
-                        CoroutineScope(Dispatchers.IO).launch {
+                        } else {
                             SupabaseService.addFavorite(
-                                SupabaseService.Favorite(
-                                    user_id = userId,
-                                    podcast_id = podcastIdStr
-                                )
+                                SupabaseService.Favorite(user_id = userId, podcast_id = podcastIdStr)
                             )
+                        }
+                        CoroutineScope(Dispatchers.Main).launch {
+                            binding.btnFavorite.isEnabled = true
+                            if (result.isSuccess) {
+                                if (currentlyFav) {
+                                    favoriteIds.remove(podcastIdStr)
+                                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                                } else {
+                                    favoriteIds.add(podcastIdStr)
+                                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
+                                }
+                            } else {
+                                Toast.makeText(
+                                    binding.root.context,
+                                    "No pudimos actualizar el favorito. Intenta de nuevo",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     }
                     onFavoriteClick?.invoke(podcast)

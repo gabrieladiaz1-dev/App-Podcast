@@ -37,15 +37,15 @@ object MockData {
     fun getFavoritePodcasts(): List<Podcast> = allPodcasts.filter { it.id in _favoriteIds }
 
     val playlists = mutableListOf(
-        Playlist(1, "Favoritos", mutableListOf(1, 3, 5)),
-        Playlist(2, "Para programar", mutableListOf(7, 2)),
-        Playlist(3, "Aprender algo nuevo", mutableListOf(3, 1))
+        Playlist(1, name = "Favoritos", podcastIds = mutableListOf(1, 3, 5)),
+        Playlist(2, name = "Para programar", podcastIds = mutableListOf(7, 2)),
+        Playlist(3, name = "Aprender algo nuevo", podcastIds = mutableListOf(3, 1))
     )
 
     private var nextPlaylistId = 4
 
     fun createPlaylist(name: String): Playlist {
-        val p = Playlist(nextPlaylistId++, name)
+        val p = Playlist(nextPlaylistId++, name = name)
         playlists.add(p)
         return p
     }

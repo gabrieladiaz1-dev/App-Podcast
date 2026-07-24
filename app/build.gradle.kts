@@ -67,6 +67,12 @@ dependencies {
     // SwipeRefresh
     implementation(libs.swiperefreshlayout)
 
+    // Image loading
+    implementation(libs.coil)
+
+    // Media for notification MediaStyle
+    implementation(libs.media.compat)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

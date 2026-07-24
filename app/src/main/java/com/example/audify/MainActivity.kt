@@ -6,8 +6,9 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.NavController
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
+import androidx.navigation.ui.setupWithNavController
 import com.example.audify.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,7 +17,6 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     lateinit var binding: ActivityMainBinding
-    private lateinit var navController: NavController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,55 +29,62 @@ class MainActivity : AppCompatActivity() {
 
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        navController = navHostFragment.navController
+        val navController = navHostFragment.navController
 
-        navController.addOnDestinationChangedListener { _, dest, _ ->
-            val menu = binding.bottomNavigation.menu
-            for (i in 0 until menu.size()) {
-                menu.getItem(i).isChecked = menu.getItem(i).itemId == dest.id
-            }
-        }
+        binding.bottomNavigation.setupWithNavController(navController)
 
         binding.bottomNavigation.setOnItemSelectedListener { item ->
-            val destId = item.itemId
-            navController.popBackStack(navController.graph.startDestinationId, false)
-            if (destId != navController.currentDestination?.id) {
-                navController.navigate(destId)
+            val builder = NavOptions.Builder()
+                .setLaunchSingleTop(true)
+            if (item.itemId == R.id.inicioFragment) {
+                builder.setPopUpTo(R.id.inicioFragment, true)
+            } else {
+                builder.setPopUpTo(R.id.inicioFragment, false)
             }
-            true
+            try {
+                navController.navigate(item.itemId, null, builder.build())
+                true
+            } catch (_: Exception) {
+                false
+            }
         }
 
         loadDrawerUserData()
 
         binding.navigationView.setNavigationItemSelectedListener { item ->
+            val navOptions = NavOptions.Builder()
+                .setPopUpTo(R.id.nav_graph, true)
+                .setLaunchSingleTop(true)
+                .build()
+
             when (item.itemId) {
-                R.id.nav_inicio -> navigateToBottomNav(R.id.inicioFragment)
+                R.id.nav_inicio -> navController.navigate(R.id.inicioFragment, null, navOptions)
                 R.id.nav_subir -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
                     } else {
-                        navController.navigate(R.id.uploadFragment)
+                        navController.navigate(R.id.uploadFragment, null, navOptions)
                     }
                 }
                 R.id.nav_favoritos -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
                     } else {
-                        navigateToBottomNav(R.id.favoritesFragment)
+                        navController.navigate(R.id.favoritesFragment, null, navOptions)
                     }
                 }
                 R.id.nav_listas -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
                     } else {
-                        navController.navigate(R.id.listsFragment)
+                        navController.navigate(R.id.listsFragment, null, navOptions)
                     }
                 }
                 R.id.nav_borradores -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
                     } else {
-                        navController.navigate(R.id.draftsFragment)
+                        navController.navigate(R.id.draftsFragment, null, navOptions)
                     }
                 }
                 R.id.nav_cerrar_sesion -> {
@@ -93,13 +100,6 @@ class MainActivity : AppCompatActivity() {
             }
             binding.drawerLayout.closeDrawer(GravityCompat.START)
             true
-        }
-    }
-
-    private fun navigateToBottomNav(destId: Int) {
-        navController.popBackStack(navController.graph.startDestinationId, false)
-        if (navController.currentDestination?.id != destId) {
-            navController.navigate(destId)
         }
     }
 

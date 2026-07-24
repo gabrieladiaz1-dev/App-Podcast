@@ -109,35 +109,12 @@
                 android:textStyle="bold" />
 
             <EditText
-                android:id="@+id/edtUsername"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:autofillHints="username"
-                android:background="@drawable/bg_edittext"
-                android:hint="Tu nombre de usuario"
-                android:inputType="textNoSuggestions"
-                android:paddingHorizontal="14dp"
-                android:textColor="#333333"
-                android:textColorHint="#999999"
-                android:textSize="14sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="4dp"
-                android:text="@string/profile_name_label"
-                android:textColor="#333333"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <EditText
                 android:id="@+id/edtNombre"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:autofillHints="name"
                 android:background="@drawable/bg_edittext"
-                android:hint="@string/profile_name_hint"
+                android:hint="Tu nombre de usuario"
                 android:inputType="textPersonName"
                 android:paddingHorizontal="14dp"
                 android:textColor="#333333"
