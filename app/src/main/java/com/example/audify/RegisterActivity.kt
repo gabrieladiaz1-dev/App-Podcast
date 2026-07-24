@@ -17,7 +17,10 @@ class RegisterActivity : AppCompatActivity() {
     private var isConfirmVisible = false
 
     private var pendingName = ""
+<<<<<<< HEAD
     private var pendingUsername = ""
+=======
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
     private var pendingEmail = ""
     private var pendingPassword = ""
 
@@ -107,7 +110,10 @@ class RegisterActivity : AppCompatActivity() {
 
             if (!hasError) {
                 pendingName = name
+<<<<<<< HEAD
                 pendingUsername = username
+=======
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
                 pendingEmail = email
                 pendingPassword = password
                 showConfirmationDialog()
@@ -135,6 +141,7 @@ class RegisterActivity : AppCompatActivity() {
         binding.btnRegister.isEnabled = false
         binding.btnRegister.text = "Registrando..."
         lifecycleScope.launch {
+<<<<<<< HEAD
             val available = SupabaseService.isUsernameAvailable(pendingUsername)
                 .getOrNull() ?: true
             if (!available) {
@@ -148,6 +155,11 @@ class RegisterActivity : AppCompatActivity() {
             SupabaseService.registerUser(pendingEmail, pendingPassword)
                 .onSuccess { userId ->
                     SupabaseService.createProfile(userId, pendingName, pendingUsername)
+=======
+            SupabaseService.registerUser(pendingEmail, pendingPassword)
+                .onSuccess { userId ->
+                    SupabaseService.createProfile(userId, pendingName)
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
                     Toast.makeText(this@RegisterActivity, "Cuenta creada exitosamente", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this@RegisterActivity, LoginActivity::class.java))
                     finish()

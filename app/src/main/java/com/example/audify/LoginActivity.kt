@@ -72,8 +72,13 @@ class LoginActivity : AppCompatActivity() {
                 setLoadingState(true)
                 lifecycleScope.launch {
                     SupabaseService.loginUser(email, password)
+<<<<<<< HEAD
                         .onSuccess {
                             SessionManager.saveSession(email)
+=======
+                        .onSuccess { userId ->
+                            SessionManager.saveSession(email, userId)
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
                             navigateToMain()
                         }
                         .onFailure { error ->

@@ -111,6 +111,7 @@
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
+<<<<<<< HEAD
             <TextView
                 android:id="@+id/txtUsername"
                 android:layout_width="wrap_content"
@@ -119,6 +120,8 @@
                 android:textColor="#C4B5FD"
                 android:textSize="12sp" />
 
+=======
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

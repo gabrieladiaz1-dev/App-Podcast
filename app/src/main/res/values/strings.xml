@@ -97,6 +97,14 @@
     <string name="upload_desc_required">Escribe una descripci\u00f3n</string>
     <string name="upload_permission_denied">Permiso denegado. Revisa la configuraci\u00f3n de la app.</string>
     <string name="upload_recording_error">Error al iniciar la grabaci\u00f3n</string>
+<<<<<<< HEAD
+=======
+    <string name="upload_save_draft">Guardar como borrador</string>
+    <string name="upload_success_message">Tu podcast ha sido enviado correctamente.\n\nestar\u00e1 en revisi\u00f3n para comprobar que cumple con fines acad\u00e9micos. Mientras tanto, el podcast ser\u00e1 visible en tu perfil pero el audio no podr\u00e1 reproducirse hasta que sea aprobado por un administrador.</string>
+    <string name="upload_draft_saved">Borrador guardado</string>
+    <string name="upload_select_image_perm">Se necesita acceso a la galer\u00eda para seleccionar una imagen.</string>
+    <string name="upload_select_audio_perm">Se necesita acceso a los archivos para seleccionar audio.</string>
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
 
     <!-- Register Dialog -->
     <string name="register_dialog_title">T\u00e9rminos y condiciones</string>

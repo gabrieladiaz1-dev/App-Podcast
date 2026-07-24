@@ -60,7 +60,10 @@ class ProfileFragment : Fragment() {
                 binding.txtAvatar.text = fallback.firstOrNull()?.uppercase() ?: "?"
                 binding.txtNombreDisplay.text = fallback
                 binding.txtCorreo.text = email
+<<<<<<< HEAD
                 binding.edtUsername.setText(fallback.lowercase())
+=======
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
                 binding.edtNombre.setText(fallback)
             }
         }
@@ -116,6 +119,7 @@ class ProfileFragment : Fragment() {
             }
 
             lifecycleScope.launch {
+<<<<<<< HEAD
                 val usernameChanged = username != currentUsername
                 if (usernameChanged) {
                     val available = SupabaseService.isUsernameAvailable(username).getOrNull() ?: true
@@ -126,6 +130,8 @@ class ProfileFragment : Fragment() {
                     }
                 }
 
+=======
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
                 var success = true
                 var errorMsg = ""
 
@@ -134,6 +140,7 @@ class ProfileFragment : Fragment() {
                     errorMsg = it.message ?: "Error al guardar nombre"
                 }
 
+<<<<<<< HEAD
                 if (success && usernameChanged) {
                     SupabaseService.updateUsername(username).onFailure {
                         success = false
@@ -143,6 +150,9 @@ class ProfileFragment : Fragment() {
 
                 if (success) {
                     currentUsername = username
+=======
+                if (success) {
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
                     binding.txtNombreDisplay.text = name
                     binding.txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
                     binding.edtPassword.text.clear()

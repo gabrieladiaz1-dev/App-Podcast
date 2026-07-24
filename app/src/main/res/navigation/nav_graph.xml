@@ -21,7 +21,14 @@
         android:id="@+id/uploadFragment"
         android:name="com.example.audify.ui.upload.UploadFragment"
         android:label="@string/bottom_upload"
-        tools:layout="@layout/fragment_upload" />
+        tools:layout="@layout/fragment_upload">
+
+        <argument
+            android:name="draftId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+    </fragment>
 
     <fragment
         android:id="@+id/profileFragment"
@@ -63,4 +70,13 @@
             app:argType="string" />
     </fragment>
 
+<<<<<<< HEAD
+=======
+    <fragment
+        android:id="@+id/draftsFragment"
+        android:name="com.example.audify.ui.drafts.DraftsFragment"
+        android:label="@string/drawer_borradores"
+        tools:layout="@layout/fragment_drafts" />
+
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
 </navigation>

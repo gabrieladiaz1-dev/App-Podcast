@@ -52,7 +52,17 @@ class MainActivity : AppCompatActivity() {
                         navController.navigate(R.id.listsFragment)
                     }
                 }
+<<<<<<< HEAD
                 R.id.nav_borradores -> Toast.makeText(this, R.string.drawer_borradores, Toast.LENGTH_SHORT).show()
+=======
+                R.id.nav_borradores -> {
+                    if (!SessionManager.isLoggedIn()) {
+                        startActivity(Intent(this, LoginActivity::class.java))
+                    } else {
+                        navController.navigate(R.id.draftsFragment)
+                    }
+                }
+>>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
                 R.id.nav_cerrar_sesion -> {
                     SessionManager.clearSession()
                     lifecycleScope.launch(Dispatchers.IO) {
