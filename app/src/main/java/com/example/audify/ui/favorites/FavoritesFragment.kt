@@ -1,5 +1,6 @@
 package com.example.audify.ui.favorites
 
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -12,7 +13,9 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.audify.LoginActivity
 import com.example.audify.R
+import com.example.audify.SessionManager
 import com.example.audify.data.MockData
 import com.example.audify.databinding.FragmentFavoritesBinding
 import com.example.audify.ui.adapter.PodcastAdapter
@@ -33,6 +36,11 @@ class FavoritesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        if (!SessionManager.isLoggedIn()) {
+            startActivity(Intent(requireContext(), LoginActivity::class.java))
+            return
+        }
 
         setupToolbar()
         setupSearch()

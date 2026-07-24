@@ -12,16 +12,20 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
 import io.ktor.client.engine.okhttp.OkHttp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 object SupabaseService {
-
 
     // ── Credenciales de Supabase ──
     private const val SUPABASE_URL = "https://oaayubturfjbtiuhvxpk.supabase.co"
     private const val SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hYXl1YnR1cmZqYnRpdWh2eHBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NTA1NjEsImV4cCI6MjEwMDIyNjU2MX0.F15ycjiRUHxddihRr78fMvroxKmdhkJAlBcTz5huxz0"
     // ────────────────────────────
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val client: SupabaseClient by lazy {
         createSupabaseClient(
@@ -35,7 +39,23 @@ object SupabaseService {
         }
     }
 
-    // ──── Parte del registro  ────
+    // ── Pre-cargar el cliente en background ──
+
+    fun preload() {
+        scope.launch {
+            try { client.auth.currentSessionOrNull() } catch (_: Exception) {}
+        }
+    }
+
+    // ──── Auth ────
+
+    fun isUserLoggedIn(): Boolean {
+        return try {
+            client.auth.currentSessionOrNull() != null
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     suspend fun registerUser(
         email: String,
@@ -54,10 +74,10 @@ object SupabaseService {
         }
     }
 
-    suspend fun createProfile(userId: String, name: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun createProfile(userId: String, name: String, username: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             client.postgrest["profiles"].insert(
-                mapOf("id" to userId, "name" to name)
+                mapOf("id" to userId, "name" to name, "username" to username)
             )
             Result.success(Unit)
         } catch (e: Exception) {
@@ -70,17 +90,23 @@ object SupabaseService {
     data class Profile(
         val id: String = "",
         val name: String = "",
+        val username: String = "",
         val avatar_url: String? = null,
         val created_at: String? = null
     )
 
     suspend fun getCurrentUserEmail(): String? {
-        return client.auth.currentUserOrNull()?.email
+        return try {
+            client.auth.currentUserOrNull()?.email
+        } catch (_: Exception) {
+            null
+        }
     }
 
     suspend fun getProfile(): Profile = withContext(Dispatchers.IO) {
         val user = client.auth.currentUserOrNull() ?: error("Usuario no autenticado")
         val defaultName = user.email?.substringBefore("@") ?: "Usuario"
+        val defaultUsername = user.email?.substringBefore("@") ?: "usuario"
         try {
             val profiles = client.postgrest["profiles"]
                 .select {
@@ -90,17 +116,17 @@ object SupabaseService {
             val existing = profiles.firstOrNull()
             if (existing != null && existing.name.isNotEmpty()) return@withContext existing
             if (existing != null) {
-                client.postgrest["profiles"].update(
-                    mapOf("name" to defaultName)
-                ) { filter { eq("id", user.id) } }
+                val updates = mutableMapOf<String, String>("name" to defaultName)
+                if (existing.username.isEmpty()) updates["username"] = defaultUsername
+                client.postgrest["profiles"].update(updates) { filter { eq("id", user.id) } }
             } else {
                 client.postgrest["profiles"].insert(
-                    mapOf("id" to user.id, "name" to defaultName)
+                    mapOf("id" to user.id, "name" to defaultName, "username" to defaultUsername)
                 )
             }
-            Profile(id = user.id, name = defaultName)
+            Profile(id = user.id, name = defaultName, username = defaultUsername)
         } catch (e: Exception) {
-            Profile(id = user.id, name = defaultName)
+            Profile(id = user.id, name = defaultName, username = defaultUsername)
         }
     }
 
@@ -117,6 +143,48 @@ object SupabaseService {
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    suspend fun isUsernameAvailable(username: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val userId = client.auth.currentUserOrNull()?.id
+            val profiles = client.postgrest["profiles"]
+                .select {
+                    filter { eq("username", username) }
+                }
+                .decodeList<Profile>()
+            val taken = profiles.any { it.id != userId }
+            Result.success(!taken)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateUsername(username: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val userId = client.auth.currentUserOrNull()?.id ?: error("Usuario no autenticado")
+            client.postgrest["profiles"].update(
+                mapOf("username" to username)
+            ) {
+                filter { eq("id", userId) }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getProfileByUserId(userId: String): Profile? = withContext(Dispatchers.IO) {
+        try {
+            val profiles = client.postgrest["profiles"]
+                .select {
+                    filter { eq("id", userId) }
+                }
+                .decodeList<Profile>()
+            profiles.firstOrNull()
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -140,21 +208,24 @@ object SupabaseService {
                 this.email = email
                 this.password = password
             }
-            getProfile()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    // ──── podcast aprovados ────
+    // ──── podcasts ────
 
     data class Podcast(
         val id: String = "",
+        val user_id: String = "",
         val title: String = "",
         val description: String = "",
+        val category_id: String = "",
         val audio_url: String = "",
-        val approved: Boolean = false
+        val cover_url: String? = null,
+        val approved: Boolean = false,
+        val created_at: String = ""
     )
 
     suspend fun getApprovedPodcasts(): Result<List<Podcast>> = withContext(Dispatchers.IO) {
@@ -170,6 +241,60 @@ object SupabaseService {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    suspend fun getPodcastsByUserId(userId: String): Result<List<Podcast>> = withContext(Dispatchers.IO) {
+        try {
+            val result = client.postgrest["podcasts"]
+                .select {
+                    filter { eq("user_id", userId) }
+                }
+                .decodeList<Podcast>()
+            Result.success(result)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun insertPodcast(
+        userId: String,
+        title: String,
+        description: String,
+        categoryId: String,
+        audioUrl: String,
+        coverUrl: String?
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val record = mutableMapOf<String, Any>(
+                "user_id" to userId,
+                "title" to title,
+                "description" to description,
+                "audio_url" to audioUrl,
+                "approved" to false
+            )
+            if (categoryId.isNotEmpty()) record["category_id"] = categoryId
+            if (!coverUrl.isNullOrEmpty()) record["cover_url"] = coverUrl
+            client.postgrest["podcasts"].insert(record)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun uploadCoverImage(
+        path: String,
+        imageBytes: ByteArray
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val result = client.storage.from("cover").upload(path, imageBytes)
+            Result.success(result.path)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun getPublicCoverUrl(path: String): String {
+        return client.storage.from("cover").publicUrl(path)
     }
 
     // ──── ffavoritos ────
@@ -241,7 +366,7 @@ object SupabaseService {
 
     // ──── url bucket pod  ────
 
-    fun getPublicAudioUrl(path: String): String {
-        return client.storage.from("pod").publicUrl(path)
+    fun getPublicAudioUrl(bucketName: String = "pod", path: String): String {
+        return client.storage.from(bucketName).publicUrl(path)
     }
 }

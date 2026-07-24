@@ -1,9 +1,13 @@
 package com.example.audify.ui.adapter
 
+import android.content.Intent
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
+import com.example.audify.LoginActivity
 import com.example.audify.R
+import com.example.audify.SessionManager
 import com.example.audify.data.MockData
 import com.example.audify.databinding.ItemPodcastBinding
 import com.example.audify.model.Podcast
@@ -32,19 +36,28 @@ class PodcastAdapter(
             binding.tvDescription.text = podcast.description
             binding.tvDuration.text = podcast.duration
 
-            val isFav = MockData.isFavorite(podcast.id)
-            binding.btnFavorite.setImageResource(
-                if (isFav) R.drawable.ic_favorite
-                else R.drawable.ic_favorite_border
-            )
-            binding.btnFavorite.setOnClickListener {
-                MockData.toggleFavorite(podcast.id)
-                val nowFav = MockData.isFavorite(podcast.id)
+            if (SessionManager.isLoggedIn()) {
+                val isFav = MockData.isFavorite(podcast.id)
                 binding.btnFavorite.setImageResource(
-                    if (nowFav) R.drawable.ic_favorite
+                    if (isFav) R.drawable.ic_favorite
                     else R.drawable.ic_favorite_border
                 )
-                onFavoriteClick?.invoke(podcast)
+                binding.btnFavorite.setOnClickListener {
+                    MockData.toggleFavorite(podcast.id)
+                    val nowFav = MockData.isFavorite(podcast.id)
+                    binding.btnFavorite.setImageResource(
+                        if (nowFav) R.drawable.ic_favorite
+                        else R.drawable.ic_favorite_border
+                    )
+                    onFavoriteClick?.invoke(podcast)
+                }
+            } else {
+                binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                binding.btnFavorite.alpha = 0.4f
+                binding.btnFavorite.setOnClickListener {
+                    Toast.makeText(binding.root.context, "Inicia sesi\u00f3n para agregar favoritos", Toast.LENGTH_SHORT).show()
+                    binding.root.context.startActivity(Intent(binding.root.context, LoginActivity::class.java))
+                }
             }
 
             itemView.setOnClickListener { onItemClick?.invoke(podcast) }

@@ -10,7 +10,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.example.audify.databinding.ActivityMainBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
@@ -18,6 +20,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        SessionManager.init(this)
+        SupabaseService.preload()
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -32,11 +38,30 @@ class MainActivity : AppCompatActivity() {
         binding.navigationView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_inicio -> navController.navigate(R.id.inicioFragment)
-                R.id.nav_favoritos -> navController.navigate(R.id.favoritesFragment)
-                R.id.nav_listas -> navController.navigate(R.id.listsFragment)
-                R.id.nav_borradores -> Toast.makeText(this, R.string.drawer_borradores, Toast.LENGTH_SHORT).show()
+                R.id.nav_favoritos -> {
+                    if (!SessionManager.isLoggedIn()) {
+                        startActivity(Intent(this, LoginActivity::class.java))
+                    } else {
+                        navController.navigate(R.id.favoritesFragment)
+                    }
+                }
+                R.id.nav_listas -> {
+                    if (!SessionManager.isLoggedIn()) {
+                        startActivity(Intent(this, LoginActivity::class.java))
+                    } else {
+                        navController.navigate(R.id.listsFragment)
+                    }
+                }
+                R.id.nav_borradores -> {
+                    if (!SessionManager.isLoggedIn()) {
+                        startActivity(Intent(this, LoginActivity::class.java))
+                    } else {
+                        navController.navigate(R.id.draftsFragment)
+                    }
+                }
                 R.id.nav_cerrar_sesion -> {
-                    lifecycleScope.launch {
+                    SessionManager.clearSession()
+                    lifecycleScope.launch(Dispatchers.IO) {
                         SupabaseService.signOut()
                     }
                     val intent = Intent(this, LoginActivity::class.java)
@@ -56,21 +81,26 @@ class MainActivity : AppCompatActivity() {
         val txtNombre = headerView.findViewById<TextView>(R.id.txtDrawerNombre)
         val txtCorreo = headerView.findViewById<TextView>(R.id.txtDrawerCorreo)
 
+        if (!SessionManager.isLoggedIn()) {
+            txtAvatar.text = "?"
+            txtNombre.text = getString(R.string.drawer_user_name)
+            txtCorreo.text = getString(R.string.drawer_user_email)
+            return
+        }
+
         lifecycleScope.launch {
-            try {
-                val email = SupabaseService.getCurrentUserEmail() ?: ""
-                val profile = SupabaseService.getProfile()
-                val name = profile.name.ifEmpty { email.substringBefore("@").ifEmpty { "Usuario" } }
-                txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
-                txtNombre.text = name
-                txtCorreo.text = email
-            } catch (e: Exception) {
-                val email = SupabaseService.getCurrentUserEmail() ?: ""
-                val fallback = email.substringBefore("@").ifEmpty { "Usuario" }
-                txtAvatar.text = fallback.firstOrNull()?.uppercase() ?: "?"
-                txtNombre.text = fallback
-                txtCorreo.text = email
+            val email = withContext(Dispatchers.IO) {
+                SupabaseService.getCurrentUserEmail() ?: ""
             }
+            val profile = withContext(Dispatchers.IO) {
+                try { SupabaseService.getProfile() } catch (_: Exception) {
+                    SupabaseService.Profile(name = email.substringBefore("@"))
+                }
+            }
+            val name = profile.name.ifEmpty { email.substringBefore("@").ifEmpty { "Usuario" } }
+            txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
+            txtNombre.text = name
+            txtCorreo.text = email
         }
     }
 }

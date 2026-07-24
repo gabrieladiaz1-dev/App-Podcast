@@ -10,6 +10,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.example.audify.LoginActivity
 import com.example.audify.R
+import com.example.audify.SessionManager
 import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentProfileBinding
 import kotlinx.coroutines.launch
@@ -18,6 +19,7 @@ class ProfileFragment : Fragment() {
 
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = _binding!!
+    private var currentUsername = ""
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -31,6 +33,11 @@ class ProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        if (!SessionManager.isLoggedIn()) {
+            startActivity(Intent(requireContext(), LoginActivity::class.java))
+            return
+        }
+
         loadUserData()
         setupClickListeners()
     }
@@ -41,9 +48,11 @@ class ProfileFragment : Fragment() {
                 val email = SupabaseService.getCurrentUserEmail() ?: ""
                 val profile = SupabaseService.getProfile()
                 val name = profile.name.ifEmpty { email.substringBefore("@").ifEmpty { "Usuario" } }
+                currentUsername = profile.username.ifEmpty { email.substringBefore("@").ifEmpty { "usuario" } }
                 binding.txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
                 binding.txtNombreDisplay.text = name
                 binding.txtCorreo.text = email
+                binding.edtUsername.setText(currentUsername)
                 binding.edtNombre.setText(name)
             } catch (e: Exception) {
                 val email = SupabaseService.getCurrentUserEmail() ?: ""
@@ -51,6 +60,8 @@ class ProfileFragment : Fragment() {
                 binding.txtAvatar.text = fallback.firstOrNull()?.uppercase() ?: "?"
                 binding.txtNombreDisplay.text = fallback
                 binding.txtCorreo.text = email
+                binding.edtUsername.setText(fallback.lowercase())
+                binding.edtNombre.setText(fallback)
             }
         }
     }
@@ -59,13 +70,32 @@ class ProfileFragment : Fragment() {
         binding.btnBack.setOnClickListener { /* no-op, es un tab */ }
 
         binding.btnNotificacion.setOnClickListener {
-            Toast.makeText(requireContext(), "Pr\u00f3ximamente", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.notif_coming_soon), Toast.LENGTH_SHORT).show()
         }
 
         binding.btnGuardar.setOnClickListener {
             val name = binding.edtNombre.text.toString().trim()
+            val username = binding.edtUsername.text.toString().trim()
             val password = binding.edtPassword.text.toString().trim()
             val confirmPassword = binding.edtConfirmPassword.text.toString().trim()
+
+            if (username.isEmpty()) {
+                Toast.makeText(requireContext(), "El nombre de usuario no puede estar vac\u00edo", Toast.LENGTH_SHORT).show()
+                binding.edtUsername.requestFocus()
+                return@setOnClickListener
+            }
+
+            if (username.length < 3) {
+                Toast.makeText(requireContext(), "El nombre de usuario debe tener al menos 3 caracteres", Toast.LENGTH_SHORT).show()
+                binding.edtUsername.requestFocus()
+                return@setOnClickListener
+            }
+
+            if (!username.matches(Regex("^[a-zA-Z0-9._]+$"))) {
+                Toast.makeText(requireContext(), "El nombre de usuario solo puede contener letras, n\u00fameros, puntos y guiones bajos", Toast.LENGTH_SHORT).show()
+                binding.edtUsername.requestFocus()
+                return@setOnClickListener
+            }
 
             if (name.isEmpty()) {
                 Toast.makeText(requireContext(), "El nombre no puede estar vac\u00edo", Toast.LENGTH_SHORT).show()
@@ -86,19 +116,46 @@ class ProfileFragment : Fragment() {
             }
 
             lifecycleScope.launch {
-                SupabaseService.updateProfileName(name).onSuccess {
+                val usernameChanged = username != currentUsername
+                if (usernameChanged) {
+                    val available = SupabaseService.isUsernameAvailable(username).getOrNull() ?: true
+                    if (!available) {
+                        Toast.makeText(requireContext(), "Ese nombre de usuario ya est\u00e1 en uso", Toast.LENGTH_SHORT).show()
+                        binding.edtUsername.requestFocus()
+                        return@launch
+                    }
+                }
+
+                var success = true
+                var errorMsg = ""
+
+                SupabaseService.updateProfileName(name).onFailure {
+                    success = false
+                    errorMsg = it.message ?: "Error al guardar nombre"
+                }
+
+                if (success && usernameChanged) {
+                    SupabaseService.updateUsername(username).onFailure {
+                        success = false
+                        errorMsg = it.message ?: "Error al guardar usuario"
+                    }
+                }
+
+                if (success) {
+                    currentUsername = username
                     binding.txtNombreDisplay.text = name
                     binding.txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
                     binding.edtPassword.text.clear()
                     binding.edtConfirmPassword.text.clear()
                     Toast.makeText(requireContext(), "Cambios guardados", Toast.LENGTH_SHORT).show()
-                }.onFailure { error ->
-                    Toast.makeText(requireContext(), "Error: ${error.message}", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(requireContext(), "Error: $errorMsg", Toast.LENGTH_LONG).show()
                 }
             }
         }
 
         binding.btnCerrarSesion.setOnClickListener {
+            SessionManager.clearSession()
             lifecycleScope.launch {
                 SupabaseService.signOut()
             }

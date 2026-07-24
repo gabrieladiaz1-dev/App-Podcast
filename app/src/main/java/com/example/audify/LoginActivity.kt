@@ -3,6 +3,7 @@ package com.example.audify
 import android.content.Intent
 import android.os.Bundle
 import android.text.method.PasswordTransformationMethod
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -16,8 +17,20 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        SessionManager.init(this)
+
+        // Verificar sesión local primero, luego Supabase
+        if (SessionManager.isLoggedIn()) {
+            navigateToMain()
+            return
+        }
+
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Pre-cargar el cliente Supabase en background
+        SupabaseService.preload()
 
         binding.etEmail.requestFocus()
 
@@ -56,18 +69,18 @@ class LoginActivity : AppCompatActivity() {
             }
 
             if (!hasError) {
-                binding.btnSignIn.isEnabled = false
+                setLoadingState(true)
                 lifecycleScope.launch {
                     SupabaseService.loginUser(email, password)
                         .onSuccess {
-                            Toast.makeText(this@LoginActivity, "Inicio de sesi\u00f3n exitoso", Toast.LENGTH_SHORT).show()
-                            startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-                            finish()
+                            SessionManager.saveSession(email)
+                            navigateToMain()
                         }
                         .onFailure { error ->
-                            Toast.makeText(this@LoginActivity, "Error: ${error.message}", Toast.LENGTH_LONG).show()
+                            setLoadingState(false)
+                            val msg = error.message ?: "Error desconocido"
+                            Toast.makeText(this@LoginActivity, "Error: $msg", Toast.LENGTH_LONG).show()
                         }
-                    binding.btnSignIn.isEnabled = true
                 }
             }
         }
@@ -81,7 +94,17 @@ class LoginActivity : AppCompatActivity() {
         }
 
         binding.tvSkip.setOnClickListener {
-            startActivity(Intent(this, MainActivity::class.java))
+            navigateToMain()
         }
+    }
+
+    private fun navigateToMain() {
+        startActivity(Intent(this, MainActivity::class.java))
+        finish()
+    }
+
+    private fun setLoadingState(loading: Boolean) {
+        binding.btnSignIn.isEnabled = !loading
+        binding.btnSignIn.text = if (loading) "Ingresando..." else getString(R.string.btn_sign_in)
     }
 }
