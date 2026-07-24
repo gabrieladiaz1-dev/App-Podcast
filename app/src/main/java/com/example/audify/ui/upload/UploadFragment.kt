@@ -176,6 +176,16 @@ class UploadFragment : Fragment() {
             .setCancelable(false)
             .show()
         lifecycleScope.launch {
+            val sessionOk = withContext(Dispatchers.IO) {
+                SupabaseService.ensureValidSession()
+            }
+            if (!sessionOk) {
+                progressDialog.dismiss()
+                Toast.makeText(requireContext(), "Tu sesión expiró, por favor inicia sesión de nuevo", Toast.LENGTH_LONG).show()
+                SessionManager.clearSession()
+                startActivity(Intent(requireContext(), LoginActivity::class.java))
+                return@launch
+            }
             val result = withContext(Dispatchers.IO) {
                 SupabaseService.getCategories()
             }
@@ -185,11 +195,17 @@ class UploadFragment : Fragment() {
                 if (categoriesLoaded.isNotEmpty()) {
                     showCategoryDialog()
                 } else {
-                    Toast.makeText(requireContext(), "No se encontraron categorías. Revisa tu conexión", Toast.LENGTH_LONG).show()
+                    Toast.makeText(requireContext(), "No se encontraron categorías", Toast.LENGTH_LONG).show()
                 }
             } else {
                 val err = result.exceptionOrNull()
-                Toast.makeText(requireContext(), "Error: ${err?.message ?: "desconocido"}", Toast.LENGTH_LONG).show()
+                if (err is SupabaseService.SessionExpiredException) {
+                    Toast.makeText(requireContext(), err.message, Toast.LENGTH_LONG).show()
+                    SessionManager.clearSession()
+                    startActivity(Intent(requireContext(), LoginActivity::class.java))
+                } else {
+                    Toast.makeText(requireContext(), "No pudimos cargar las categorías. Intenta de nuevo", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

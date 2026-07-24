@@ -42,7 +42,34 @@ object SupabaseService {
 
     fun preload() {
         scope.launch {
-            try { client.auth.currentSessionOrNull() } catch (_: Exception) {}
+            try {
+                val session = client.auth.currentSessionOrNull()
+                if (session != null) {
+                    tryToRefreshSession(session.refreshToken)
+                    Log.d("SupabaseService", "Sesión restaurada y refrescada")
+                }
+            } catch (e: Exception) {
+                Log.e("SupabaseService", "Error restaurando sesión: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun tryToRefreshSession(refreshToken: String) {
+        try {
+            client.auth.refreshSession(refreshToken)
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "No se pudo refrescar: ${e.message}")
+        }
+    }
+
+    suspend fun ensureValidSession(): Boolean {
+        return try {
+            val session = client.auth.currentSessionOrNull() ?: return false
+            tryToRefreshSession(session.refreshToken)
+            client.auth.currentSessionOrNull() != null
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "Error en ensureValidSession: ${e.message}")
+            false
         }
     }
 
@@ -197,7 +224,7 @@ object SupabaseService {
                 .decodeList<Podcast>()
             Result.success(result)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(wrapJwtError(e))
         }
     }
 
@@ -210,7 +237,7 @@ object SupabaseService {
                 .decodeList<Podcast>()
             Result.success(result)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(wrapJwtError(e))
         }
     }
 
@@ -235,7 +262,7 @@ object SupabaseService {
             client.postgrest["podcasts"].insert(record)
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(wrapJwtError(e))
         }
     }
 
@@ -266,7 +293,7 @@ object SupabaseService {
             client.postgrest["favorites"].insert(favorite)
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(wrapJwtError(e))
         }
     }
 
@@ -316,9 +343,19 @@ object SupabaseService {
             Result.success(result)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error fetching categories: ${e.message}", e)
-            Result.failure(e)
+            Result.failure(wrapJwtError(e))
         }
     }
+
+    class SessionExpiredException : Exception("Tu sesión expiró, por favor inicia sesión de nuevo")
+
+    private fun isJwtError(e: Exception): Boolean {
+        val msg = e.message?.lowercase() ?: ""
+        return msg.contains("jwt") || msg.contains("expired") || msg.contains("401") || msg.contains("unauthorized")
+    }
+
+    private fun wrapJwtError(e: Exception): Exception =
+        if (isJwtError(e)) SessionExpiredException() else e
 
     fun getPublicAudioUrl(bucketName: String = "pod", path: String): String {
         return client.storage.from(bucketName).publicUrl(path)
