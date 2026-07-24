@@ -21,12 +21,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-<<<<<<< HEAD
-import com.example.audify.LoginActivity
-import com.example.audify.R
-import com.example.audify.SessionManager
-import com.example.audify.databinding.FragmentUploadBinding
-=======
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import com.example.audify.LoginActivity
@@ -34,10 +28,10 @@ import com.example.audify.R
 import com.example.audify.SessionManager
 import com.example.audify.SupabaseService
 import com.example.audify.data.DraftsManager
->>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
-import com.example.audify.data.MockData
 import com.example.audify.databinding.FragmentUploadBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
@@ -50,7 +44,8 @@ class UploadFragment : Fragment() {
     private var coverUri: Uri? = null
     private var audioFileName: String? = null
     private var selectedCategory: String? = null
-    private var selectedCategoryId: String = ""
+    private var selectedCategoryId: Int = 0
+    private var categoriesLoaded: List<SupabaseService.Category> = emptyList()
 
     private var mediaRecorder: MediaRecorder? = null
     private var isRecording = false
@@ -73,7 +68,6 @@ class UploadFragment : Fragment() {
         return name
     }
 
-    // ── Image picker: Photo Picker (funciona en emuladores) ──
     private val imagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) {
             coverUri = uri
@@ -84,7 +78,6 @@ class UploadFragment : Fragment() {
         }
     }
 
-    // ── Audio picker: GetContent como fallback ──
     private val audioPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             stopPlayback()
@@ -95,7 +88,6 @@ class UploadFragment : Fragment() {
         }
     }
 
-    // ── Audio fallback: Intent directo ──
     private val audioIntentLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val uri = result.data?.data
@@ -130,14 +122,10 @@ class UploadFragment : Fragment() {
             startActivity(Intent(requireContext(), LoginActivity::class.java))
             return
         }
-<<<<<<< HEAD
-
-        binding.cardCover.setOnClickListener { imagePicker.launch("image/*") }
-=======
->>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
 
         DraftsManager.init(requireContext())
         setupListeners()
+        loadCategoriesFromSupabase()
         loadDraftIfPresent()
     }
 
@@ -167,16 +155,27 @@ class UploadFragment : Fragment() {
     }
 
     private fun pickAudio() {
-        // Try GetContent first (works on most emulators)
         try {
             audioPicker.launch("audio/*")
         } catch (e: Exception) {
-            // Fallback: direct Intent
             val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                 type = "audio/*"
                 addCategory(Intent.CATEGORY_OPENABLE)
             }
             audioIntentLauncher.launch(intent)
+        }
+    }
+
+    private fun loadCategoriesFromSupabase() {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                SupabaseService.getCategories()
+            }
+            if (result.isSuccess) {
+                categoriesLoaded = result.getOrNull() ?: emptyList()
+            } else {
+                categoriesLoaded = emptyList()
+            }
         }
     }
 
@@ -357,13 +356,18 @@ class UploadFragment : Fragment() {
     }
 
     private fun showCategoryDialog() {
-        val categories = MockData.getCategories().toTypedArray()
+        if (categoriesLoaded.isEmpty()) {
+            Toast.makeText(requireContext(), "Cargando categorías...", Toast.LENGTH_SHORT).show()
+            loadCategoriesFromSupabase()
+            return
+        }
+        val categoryNames = categoriesLoaded.map { it.name }.toTypedArray()
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.upload_category_dialog_title)
-            .setItems(categories) { _, which ->
-                selectedCategory = categories[which]
-                selectedCategoryId = (which + 1).toString()
-                binding.txtSelectedCategory.text = categories[which]
+            .setItems(categoryNames) { _, which ->
+                selectedCategory = categoryNames[which]
+                selectedCategoryId = categoriesLoaded[which].id
+                binding.txtSelectedCategory.text = categoryNames[which]
                 binding.txtSelectedCategory.setTextColor(0xFF1E1B4B.toInt())
             }
             .show()
@@ -386,6 +390,11 @@ class UploadFragment : Fragment() {
         }
         binding.tilDescription.error = null
 
+        if (selectedCategoryId == 0) {
+            Toast.makeText(requireContext(), "Selecciona una categoría", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         if (audioUri == null && recordedFile == null) {
             Toast.makeText(requireContext(), R.string.upload_audio_required, Toast.LENGTH_SHORT).show()
             return
@@ -407,7 +416,11 @@ class UploadFragment : Fragment() {
     }
 
     private fun publishToSupabase() {
-        val userId = SessionManager.getUserId() ?: return
+        val userId = SessionManager.getUserId()
+        if (userId.isNullOrEmpty()) {
+            Toast.makeText(requireContext(), "Error: sesión no válida", Toast.LENGTH_SHORT).show()
+            return
+        }
         val title = binding.edtTitle.text.toString().trim()
         val desc = binding.edtDescription.text.toString().trim()
 
@@ -415,7 +428,6 @@ class UploadFragment : Fragment() {
 
         lifecycleScope.launch {
             try {
-                // 1. Upload audio to "priv" (pending review)
                 val audioBytes = getAudioBytes() ?: run {
                     setLoading(false)
                     showError("No se pudo leer el archivo de audio")
@@ -423,36 +435,58 @@ class UploadFragment : Fragment() {
                 }
                 val audioFileNameClean = audioFileName?.replace(Regex("[^a-zA-Z0-9._-]"), "_") ?: "audio.m4a"
                 val audioPath = "${userId}/${UUID.randomUUID()}_$audioFileNameClean"
-                val audioResult = SupabaseService.uploadAudio(bucketName = "priv", path = audioPath, audioBytes = audioBytes)
+                val audioResult = withContext(Dispatchers.IO) {
+                    SupabaseService.uploadAudio(bucketName = "priv", path = audioPath, audioBytes = audioBytes)
+                }
                 if (audioResult.isFailure) {
                     setLoading(false)
-                    showError("Error al subir el audio: ${audioResult.exceptionOrNull()?.message}")
+                    val ex = audioResult.exceptionOrNull()
+                    val msg = when {
+                        ex?.message?.contains("RLS", true) == true ->
+                            "Error de permisos (RLS): verifica que la política del bucket 'priv' permita subir archivos a usuarios autenticados."
+                        ex?.message?.contains("row-level security", true) == true ->
+                            "Error RLS: la política del bucket 'priv' bloquea la subida. Configura una política INSERT en Supabase Storage."
+                        ex?.message?.contains("timed out", true) == true || ex?.message?.contains("timeout", true) == true ->
+                            "Tiempo de conexión agotado. Verifica tu conexión a internet e intenta de nuevo."
+                        ex?.message?.contains("host", true) == true || ex?.message?.contains("resolve", true) == true ->
+                            "No se pudo conectar a Supabase. Verifica tu conexión a internet."
+                        else -> "Error al subir el audio: ${ex?.message ?: "Error desconocido"}"
+                    }
+                    showError(msg)
                     return@launch
                 }
-                val audioUrl = SupabaseService.getPublicAudioUrl("priv", audioPath)
+                val audioUrl = withContext(Dispatchers.IO) {
+                    SupabaseService.getPublicAudioUrl("priv", audioPath)
+                }
 
-                // 2. Upload cover to "cover" bucket
                 var coverUrl: String? = null
                 coverUri?.let { uri ->
-                    val coverBytes = SupabaseService.readUriToBytes(requireContext(), uri)
+                    val coverBytes = withContext(Dispatchers.IO) {
+                        SupabaseService.readUriToBytes(requireContext(), uri)
+                    }
                     if (coverBytes != null) {
                         val coverPath = "${userId}/${UUID.randomUUID()}_cover.jpg"
-                        val coverResult = SupabaseService.uploadCoverImage(coverPath, coverBytes)
+                        val coverResult = withContext(Dispatchers.IO) {
+                            SupabaseService.uploadCoverImage(coverPath, coverBytes)
+                        }
                         if (coverResult.isSuccess) {
-                            coverUrl = SupabaseService.getPublicCoverUrl(coverPath)
+                            coverUrl = withContext(Dispatchers.IO) {
+                                SupabaseService.getPublicCoverUrl(coverPath)
+                            }
                         }
                     }
                 }
 
-                // 3. Insert podcast record
-                val insertResult = SupabaseService.insertPodcast(
-                    userId = userId,
-                    title = title,
-                    description = desc,
-                    categoryId = selectedCategoryId,
-                    audioUrl = audioUrl,
-                    coverUrl = coverUrl
-                )
+                val insertResult = withContext(Dispatchers.IO) {
+                    SupabaseService.insertPodcast(
+                        userId = userId,
+                        title = title,
+                        description = desc,
+                        categoryId = selectedCategoryId.toString(),
+                        audioUrl = audioUrl,
+                        coverUrl = coverUrl
+                    )
+                }
 
                 setLoading(false)
 
@@ -460,7 +494,17 @@ class UploadFragment : Fragment() {
                     editingDraftId?.let { DraftsManager.deleteDraft(requireContext(), it) }
                     showSuccessAndNavigate()
                 } else {
-                    showError("Error al guardar el podcast: ${insertResult.exceptionOrNull()?.message}")
+                    val ex = insertResult.exceptionOrNull()
+                    val msg = when {
+                        ex?.message?.contains("RLS", true) == true || ex?.message?.contains("row-level security", true) == true ->
+                            "Error de permisos (RLS): verifica que la tabla 'podcasts' tenga una política INSERT para usuarios autenticados."
+                        ex?.message?.contains("duplicate", true) == true ->
+                            "Ya existe un podcast con estos datos."
+                        ex?.message?.contains("foreign key", true) == true || ex?.message?.contains("violates", true) == true ->
+                            "Error de integridad: verifica que la categoría seleccionada sea válida."
+                        else -> "Error al guardar el podcast: ${ex?.message ?: "Error desconocido"}"
+                    }
+                    showError(msg)
                 }
             } catch (e: Exception) {
                 setLoading(false)
@@ -527,7 +571,7 @@ class UploadFragment : Fragment() {
         Toast.makeText(requireContext(), getString(R.string.upload_draft_saved), Toast.LENGTH_SHORT).show()
 
         try {
-            Navigation.findNavController(requireView()).navigate(R.id.podcastsFragment)
+            Navigation.findNavController(requireView()).navigate(R.id.profileFragment)
         } catch (_: Exception) {}
     }
 
@@ -553,11 +597,11 @@ class UploadFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle("Podcast enviado")
             .setIcon(R.drawable.ic_check_circle)
-            .setMessage(getString(R.string.upload_success_message))
-            .setPositiveButton("Ver mis podcasts") { _, _ ->
+            .setMessage("Tu podcast ha sido enviado para revisión. Podrás verlo una vez sea aprobado por un administrador.")
+            .setPositiveButton("Ver mi perfil") { _, _ ->
                 resetForm()
                 try {
-                    Navigation.findNavController(requireView()).navigate(R.id.podcastsFragment)
+                    Navigation.findNavController(requireView()).navigate(R.id.profileFragment)
                 } catch (_: Exception) {}
             }
             .setCancelable(false)
@@ -570,7 +614,7 @@ class UploadFragment : Fragment() {
         binding.edtDescription.text?.clear()
         binding.tilDescription.error = null
         selectedCategory = null
-        selectedCategoryId = ""
+        selectedCategoryId = 0
         binding.txtSelectedCategory.text = getString(R.string.upload_select_category)
         binding.txtSelectedCategory.setTextColor(0xFF999999.toInt())
         stopPlayback()

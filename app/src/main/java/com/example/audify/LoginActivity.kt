@@ -3,8 +3,8 @@ package com.example.audify
 import android.content.Intent
 import android.os.Bundle
 import android.text.method.PasswordTransformationMethod
-import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.audify.databinding.ActivityLoginBinding
@@ -20,7 +20,6 @@ class LoginActivity : AppCompatActivity() {
 
         SessionManager.init(this)
 
-        // Verificar sesión local primero, luego Supabase
         if (SessionManager.isLoggedIn()) {
             navigateToMain()
             return
@@ -29,7 +28,6 @@ class LoginActivity : AppCompatActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Pre-cargar el cliente Supabase en background
         SupabaseService.preload()
 
         binding.etEmail.requestFocus()
@@ -72,13 +70,8 @@ class LoginActivity : AppCompatActivity() {
                 setLoadingState(true)
                 lifecycleScope.launch {
                     SupabaseService.loginUser(email, password)
-<<<<<<< HEAD
-                        .onSuccess {
-                            SessionManager.saveSession(email)
-=======
                         .onSuccess { userId ->
                             SessionManager.saveSession(email, userId)
->>>>>>> 1b10f94c7f0acd7d0da8896266b4e4f50e09e020
                             navigateToMain()
                         }
                         .onFailure { error ->
