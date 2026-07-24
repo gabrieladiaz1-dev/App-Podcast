@@ -193,21 +193,17 @@ class AudioForegroundService : Service() {
     fun setEarpieceMode(useEarpiece: Boolean) {
         if (useEarpiece == this.useEarpiece) return
         this.useEarpiece = useEarpiece
+        val am = audioManager ?: return
         if (useEarpiece) {
-            val am = audioManager ?: return
-            val devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            val earpiece = devices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE }
-            if (earpiece != null) {
-                mediaPlayer?.setPreferredDevice(earpiece)
-                Log.d(TAG, "Routed audio to earpiece")
-            } else {
-                Log.w(TAG, "Earpiece device not found")
-            }
+            am.isSpeakerphoneOn = false
+            am.mode = AudioManager.MODE_IN_COMMUNICATION
             acquireProximityWakeLock()
+            Log.d(TAG, "Switched to earpiece")
         } else {
-            mediaPlayer?.setPreferredDevice(null)
+            am.mode = AudioManager.MODE_NORMAL
+            am.isSpeakerphoneOn = true
             releaseProximityWakeLock()
-            Log.d(TAG, "Routed audio to speaker")
+            Log.d(TAG, "Switched to speaker")
         }
     }
 
@@ -232,7 +228,6 @@ class AudioForegroundService : Service() {
     }
 
     fun stop() {
-        mediaPlayer?.setPreferredDevice(null)
         mediaPlayer?.release()
         mediaPlayer = null
         currentUrl = ""
@@ -241,6 +236,10 @@ class AudioForegroundService : Service() {
         releaseProximityWakeLock()
         proximityWakeLock = null
         isServiceRunning = false
+        audioManager?.let {
+            it.mode = AudioManager.MODE_NORMAL
+            it.isSpeakerphoneOn = true
+        }
         Log.d(TAG, "Service stopped")
     }
 
