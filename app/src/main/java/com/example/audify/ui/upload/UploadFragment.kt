@@ -1,6 +1,7 @@
 package com.example.audify.ui.upload
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.net.Uri
@@ -15,7 +16,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
+import com.example.audify.LoginActivity
 import com.example.audify.R
+import com.example.audify.SessionManager
 import com.example.audify.databinding.FragmentUploadBinding
 import com.example.audify.data.MockData
 import java.io.File
@@ -74,6 +77,11 @@ class UploadFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        if (!SessionManager.isLoggedIn()) {
+            startActivity(Intent(requireContext(), LoginActivity::class.java))
+            return
+        }
 
         binding.cardCover.setOnClickListener { imagePicker.launch("image/*") }
 

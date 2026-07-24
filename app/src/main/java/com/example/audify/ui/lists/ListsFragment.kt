@@ -1,6 +1,7 @@
 package com.example.audify.ui.lists
 
 import android.app.AlertDialog
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,7 +12,9 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.audify.LoginActivity
 import com.example.audify.R
+import com.example.audify.SessionManager
 import com.example.audify.data.MockData
 import com.example.audify.databinding.FragmentListsBinding
 import com.example.audify.model.Playlist
@@ -69,7 +72,14 @@ class ListsFragment : Fragment() {
     }
 
     private fun setupCreateList() {
-        binding.btnCreateList.setOnClickListener { showCreateListDialog() }
+        binding.btnCreateList.setOnClickListener {
+            if (!SessionManager.isLoggedIn()) {
+                Toast.makeText(requireContext(), "Inicia sesi\u00f3n para crear listas", Toast.LENGTH_SHORT).show()
+                startActivity(Intent(requireContext(), LoginActivity::class.java))
+                return@setOnClickListener
+            }
+            showCreateListDialog()
+        }
     }
 
     private fun showCreateListDialog() {
@@ -106,7 +116,14 @@ class ListsFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle(playlist.name)
             .setMessage(content)
-            .setPositiveButton("A\u00f1adir podcast") { _, _ -> showAddToPlaylistDialog(playlist) }
+            .setPositiveButton("A\u00f1adir podcast") { _, _ ->
+                if (!SessionManager.isLoggedIn()) {
+                    Toast.makeText(requireContext(), "Inicia sesi\u00f3n para modificar listas", Toast.LENGTH_SHORT).show()
+                    startActivity(Intent(requireContext(), LoginActivity::class.java))
+                    return@setPositiveButton
+                }
+                showAddToPlaylistDialog(playlist)
+            }
             .setNeutralButton("Cerrar", null)
             .show()
     }

@@ -97,4 +97,22 @@
     <string name="upload_desc_required">Escribe una descripci\u00f3n</string>
     <string name="upload_permission_denied">Permiso denegado. Revisa la configuraci\u00f3n de la app.</string>
     <string name="upload_recording_error">Error al iniciar la grabaci\u00f3n</string>
+
+    <!-- Register Dialog -->
+    <string name="register_dialog_title">T\u00e9rminos y condiciones</string>
+    <string name="register_dialog_message">Al registrarte, aceptas los siguientes t\u00e9rminos:\n\n\u2022 El correo electr\u00f3nico que proporcionas debe ser v\u00e1lido y real, ya que a trav\u00e9s de \u00e9l se enviar\u00e1n notificaciones importantes sobre tu cuenta.\n\n\u2022 Si el correo electr\u00f3nico es falso, inv\u00e1lido o no puedes acceder a \u00e9l, no se aceptar\u00e1n reclamos ni se podr\u00e1n recuperar los datos de tu cuenta.\n\n\u2022 Te comprometes a usar la plataforma de manera responsable y respetuosa.\n\n\u2022 La contrase\u00f1a elegida es de tu responsabilidad. No la compartas con terceros.</string>
+    <string name="register_dialog_accept">Aceptar y registrarme</string>
+    <string name="register_dialog_cancel">Cancelar</string>
+
+    <!-- Profile -->
+    <string name="profile_username_label">Nombre de usuario</string>
+    <string name="profile_username_hint">Tu nombre de usuario</string>
+    <string name="profile_username_required">El nombre de usuario no puede estar vac\u00edo</string>
+    <string name="profile_username_min">El nombre de usuario debe tener al menos 3 caracteres</string>
+    <string name="profile_username_invalid">El nombre de usuario solo puede contener letras, n\u00fameros, puntos y guiones bajos</string>
+    <string name="profile_username_taken">Ese nombre de usuario ya est\u00e1 en uso</string>
+    <string name="profile_saved">Cambios guardados</string>
+    <string name="profile_not_found">Usuario no encontrado</string>
+    <string name="profile_no_podcasts">Este usuario a\u00fan no tiene podcasts</string>
+    <string name="user_profile_title">Perfil</string>
 </resources>
