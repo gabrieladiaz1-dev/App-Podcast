@@ -215,7 +215,7 @@ object SupabaseService {
         userId: String,
         title: String,
         description: String,
-        categoryId: String,
+        categoryId: Long,
         audioUrl: String,
         coverUrl: String?
     ): Result<Unit> = withContext(Dispatchers.IO) {
@@ -227,7 +227,7 @@ object SupabaseService {
                 "audio_url" to audioUrl,
                 "approved" to false
             )
-            if (categoryId.isNotEmpty()) record["category_id"] = categoryId
+            if (categoryId > 0) record["category_id"] = categoryId
             if (!coverUrl.isNullOrEmpty()) record["cover_url"] = coverUrl
             client.postgrest["podcasts"].insert(record)
             Result.success(Unit)
@@ -289,9 +289,8 @@ object SupabaseService {
     }
 
     data class Category(
-        val id: Int = 0,
-        val name: String = "",
-        val created_at: String = ""
+        val id: Long = 0,
+        val name: String = ""
     )
 
     suspend fun addCategory(name: String): Result<Unit> = withContext(Dispatchers.IO) {

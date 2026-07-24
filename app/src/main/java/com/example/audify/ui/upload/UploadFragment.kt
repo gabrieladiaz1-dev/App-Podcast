@@ -44,7 +44,7 @@ class UploadFragment : Fragment() {
     private var coverUri: Uri? = null
     private var audioFileName: String? = null
     private var selectedCategory: String? = null
-    private var selectedCategoryId: Int = 0
+    private var selectedCategoryId: Long = 0
     private var categoriesLoaded: List<SupabaseService.Category> = emptyList()
 
     private var mediaRecorder: MediaRecorder? = null
@@ -399,7 +399,7 @@ class UploadFragment : Fragment() {
         }
         binding.tilDescription.error = null
 
-        if (selectedCategoryId == 0) {
+        if (selectedCategoryId == 0L) {
             Toast.makeText(requireContext(), "Selecciona una categoría", Toast.LENGTH_SHORT).show()
             return
         }
@@ -491,7 +491,7 @@ class UploadFragment : Fragment() {
                         userId = userId,
                         title = title,
                         description = desc,
-                        categoryId = selectedCategoryId.toString(),
+                        categoryId = selectedCategoryId,
                         audioUrl = audioUrl,
                         coverUrl = coverUrl
                     )
