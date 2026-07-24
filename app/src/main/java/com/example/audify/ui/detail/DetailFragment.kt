@@ -11,6 +11,8 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import coil.load
+import coil.transform.RoundedCornersTransformation
 import com.example.audify.R
 import com.example.audify.SessionManager
 import com.example.audify.SupabaseService
@@ -91,10 +93,19 @@ class DetailFragment : Fragment() {
         binding.txtCategory.text = p.category.ifEmpty { "General" }
         binding.txtDescription.text = p.description
 
+        if (!p.coverUrl.isNullOrEmpty()) {
+            binding.ivCover.load(p.coverUrl) {
+                crossfade(true)
+                placeholder(R.drawable.bg_circle_violet)
+                error(R.drawable.bg_circle_violet)
+                transformations(RoundedCornersTransformation(24f))
+            }
+        }
+
         val userId = SessionManager.getUserId()
         if (userId != null) {
             lifecycleScope.launch {
-                val isFav = SupabaseService.isFavorited(userId, p.id.toString())
+                val isFav = SupabaseService.isFavorited(userId, p.supabaseId)
                 binding.btnFavorite.setImageResource(
                     if (isFav) R.drawable.ic_favorite else R.drawable.ic_favorite_border
                 )
@@ -113,7 +124,7 @@ class DetailFragment : Fragment() {
                 Toast.makeText(requireContext(), "Ingresa para guardar favoritos", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val podcastIdStr = p.id.toString()
+            val podcastIdStr = p.supabaseId
             lifecycleScope.launch {
                 val isFav = SupabaseService.isFavorited(userId, podcastIdStr)
                 if (isFav) {
@@ -151,29 +162,32 @@ class DetailFragment : Fragment() {
             return
         }
 
-        try {
-            mediaPlayer = MediaPlayer().apply {
-                setDataSource(url)
-                setOnPreparedListener { mp ->
-                    this@DetailFragment.isPrepared = true
-                    binding.seekBar.max = mp.duration
-                    binding.txtTotalTime.text = formatTime(mp.duration)
+        lifecycleScope.launch {
+            val resolvedUrl = SupabaseService.resolveAudioUrl(url)
+            try {
+                mediaPlayer = MediaPlayer().apply {
+                    setDataSource(resolvedUrl)
+                    setOnPreparedListener { mp ->
+                        this@DetailFragment.isPrepared = true
+                        binding.seekBar.max = mp.duration
+                        binding.txtTotalTime.text = formatTime(mp.duration)
+                    }
+                    setOnCompletionListener {
+                        this@DetailFragment.isPlaying = false
+                        binding.btnPlayPause.setImageResource(R.drawable.ic_play)
+                        binding.seekBar.progress = 0
+                        binding.txtCurrentTime.text = "00:00"
+                    }
+                    setOnErrorListener { _, _, _ ->
+                        this@DetailFragment.isPrepared = false
+                        binding.btnPlayPause.setImageResource(R.drawable.ic_play)
+                        true
+                    }
+                    prepareAsync()
                 }
-                setOnCompletionListener {
-                    this@DetailFragment.isPlaying = false
-                    binding.btnPlayPause.setImageResource(R.drawable.ic_play)
-                    binding.seekBar.progress = 0
-                    binding.txtCurrentTime.text = "00:00"
-                }
-                setOnErrorListener { _, _, _ ->
-                    this@DetailFragment.isPrepared = false
-                    binding.btnPlayPause.setImageResource(R.drawable.ic_play)
-                    true
-                }
-                prepareAsync()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "No pudimos cargar el audio. Intenta de nuevo", Toast.LENGTH_SHORT).show()
             }
-        } catch (e: Exception) {
-            Toast.makeText(requireContext(), "No pudimos cargar el audio. Intenta de nuevo", Toast.LENGTH_SHORT).show()
         }
     }
 

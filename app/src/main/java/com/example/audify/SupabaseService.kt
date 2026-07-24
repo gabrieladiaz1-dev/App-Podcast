@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.minutes
 
 object SupabaseService {
 
@@ -222,6 +223,7 @@ object SupabaseService {
     private fun PodcastSupabase.toModel(): com.example.audify.model.Podcast {
         return com.example.audify.model.Podcast(
             id = this.id.hashCode(),
+            supabaseId = this.id,
             title = this.title,
             author = "",
             description = this.description,
@@ -479,5 +481,32 @@ object SupabaseService {
 
     fun getPublicAudioUrl(bucketName: String = "pod", path: String): String {
         return client.storage.from(bucketName).publicUrl(path)
+    }
+
+    suspend fun createSignedUrl(bucketName: String, path: String, expiresInMinutes: Long = 60): String {
+        return client.storage.from(bucketName)
+            .createSignedUrl(path, expiresInMinutes.minutes)
+    }
+
+    fun extractStoragePath(url: String): Pair<String, String> {
+        val marker = "/object/public/"
+        val idx = url.indexOf(marker)
+        if (idx == -1) return "priv" to url
+        val after = url.substring(idx + marker.length)
+        val slashIdx = after.indexOf('/')
+        val bucket = after.substring(0, slashIdx)
+        val path = after.substring(slashIdx + 1)
+        return bucket to path
+    }
+
+    suspend fun resolveAudioUrl(audioUrl: String): String {
+        if (!audioUrl.startsWith("http")) return audioUrl
+        return try {
+            val (bucket, path) = extractStoragePath(audioUrl)
+            createSignedUrl(bucket, path)
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "Error generando signed URL: ${e.message}")
+            audioUrl
+        }
     }
 }

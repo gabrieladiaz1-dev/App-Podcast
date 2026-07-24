@@ -5,6 +5,8 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import coil.transform.CircleCropTransformation
 import com.example.audify.LoginActivity
 import com.example.audify.R
 import com.example.audify.SessionManager
@@ -32,8 +34,8 @@ class PodcastAdapter(
         CoroutineScope(Dispatchers.IO).launch {
             for (podcast in items) {
                 try {
-                    val isFav = SupabaseService.isFavorited(userId, podcast.id.toString())
-                    if (isFav) favoriteIds.add(podcast.id.toString())
+                    val isFav = SupabaseService.isFavorited(userId, podcast.supabaseId)
+                    if (isFav) favoriteIds.add(podcast.supabaseId)
                 } catch (_: Exception) {}
             }
             CoroutineScope(Dispatchers.Main).launch {
@@ -59,6 +61,17 @@ class PodcastAdapter(
             binding.tvAuthor.text = podcast.author
             binding.tvDescription.text = podcast.description
 
+            if (!podcast.coverUrl.isNullOrEmpty()) {
+                binding.ivThumbnail.load(podcast.coverUrl) {
+                    crossfade(true)
+                    placeholder(R.drawable.bg_circle_violet)
+                    error(R.drawable.ic_audify_logo)
+                    transformations(CircleCropTransformation())
+                }
+            } else {
+                binding.ivThumbnail.setImageResource(R.drawable.ic_audify_logo)
+            }
+
             if (podcast.duration.isNotEmpty()) {
                 binding.tvDuration.text = podcast.duration
                 binding.tvDuration.visibility = android.view.View.VISIBLE
@@ -67,14 +80,14 @@ class PodcastAdapter(
             }
 
             if (SessionManager.isLoggedIn()) {
-                val isFav = favoriteIds.contains(podcast.id.toString())
+                val isFav = favoriteIds.contains(podcast.supabaseId)
                 binding.btnFavorite.setImageResource(
                     if (isFav) R.drawable.ic_favorite
                     else R.drawable.ic_favorite_border
                 )
                 binding.btnFavorite.setOnClickListener {
                     val userId = SessionManager.getUserId() ?: return@setOnClickListener
-                    val podcastIdStr = podcast.id.toString()
+                    val podcastIdStr = podcast.supabaseId
                     if (isFav) {
                         favoriteIds.remove(podcastIdStr)
                         binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
