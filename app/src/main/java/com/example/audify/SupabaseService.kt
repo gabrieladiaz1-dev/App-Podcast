@@ -14,6 +14,7 @@ import io.github.jan.supabase.serializer.JacksonSerializer
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
 import io.ktor.client.engine.okhttp.OkHttp
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -517,6 +518,17 @@ object SupabaseService {
             .createSignedUrl(path, expiresInMinutes.minutes)
     }
 
+    suspend fun moveAudioFromPrivToPod(path: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            client.storage.from("priv").copy(path, path, destinationBucket = "pod")
+            Log.d("SupabaseService", "Audio copiado de priv a pod: $path")
+            true
+        } catch (e: Exception) {
+            Log.w("SupabaseService", "No se pudo copiar de priv a pod: ${e.message}")
+            false
+        }
+    }
+
     fun extractStoragePath(url: String): Pair<String, String> {
         val marker = "/object/public/"
         val idx = url.indexOf(marker)
@@ -543,36 +555,35 @@ object SupabaseService {
         if (audioUrl.isEmpty()) return null
         if (!audioUrl.startsWith("http")) return audioUrl
 
-        val (originalBucket, path) = extractStoragePath(audioUrl)
-        Log.d("SupabaseService", "resolveAudioUrl: approved=$approved bucket=$originalBucket path=$path")
+        val (bucket, path) = extractStoragePath(audioUrl)
+        Log.d("SupabaseService", "resolveAudioUrl: approved=$approved bucket=$bucket path=$path")
 
         if (approved) {
-            val buckets = listOf("pod", "priv")
-            for (bucket in buckets) {
-                try {
-                    val signed = createSignedUrl(bucket, path)
-                    Log.d("SupabaseService", "Audio signed URL OK: bucket=$bucket url=$signed")
-                    return signed
-                } catch (e: Exception) {
-                    Log.d("SupabaseService", "Signed URL falló en bucket $bucket: ${e.message}")
+            try {
+                if (bucket == "priv") {
+                    moveAudioFromPrivToPod(path)
+                    val podUrl = getPublicAudioUrl("pod", path)
+                    Log.d("SupabaseService", "Audio aprobado, URL pod: $podUrl")
+                    return podUrl
                 }
+            } catch (e: Exception) {
+                Log.w("SupabaseService", "Copy a pod falló, usando URL original: ${e.message}")
             }
-            Log.e("SupabaseService", "No se pudo generar signed URL para ningún bucket")
-            return null
+            return audioUrl
         }
 
         val userId = try { client.auth.currentUserOrNull()?.id } catch (_: Exception) { null }
         if (userId == null) {
-            Log.d("SupabaseService", "Audio pendiente sin usuario → null")
+            Log.d("SupabaseService", "Audio pendiente sin usuario autenticado → null")
             return null
         }
 
         try {
-            val signed = createSignedUrl("priv", path)
-            Log.d("SupabaseService", "Audio signed URL priv (owner): $signed")
+            val signed = createSignedUrl(bucket, path)
+            Log.d("SupabaseService", "Audio signed URL ($bucket): $signed")
             return signed
         } catch (e: Exception) {
-            Log.e("SupabaseService", "Error signed URL priv: ${e.message}")
+            Log.e("SupabaseService", "Error signed URL: ${e.message}")
             return null
         }
     }
