@@ -3,13 +3,13 @@ package com.example.audify.ui.adapter
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.example.audify.data.MockData
 import com.example.audify.databinding.ItemPlaylistBinding
 import com.example.audify.model.Playlist
 
 class PlaylistAdapter(
     private val items: List<Playlist>,
-    private val onItemClick: (Playlist) -> Unit
+    private val onItemClick: (Playlist) -> Unit,
+    private val onDeleteClick: ((Playlist) -> Unit)? = null
 ) : RecyclerView.Adapter<PlaylistAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -25,9 +25,10 @@ class PlaylistAdapter(
 
     inner class ViewHolder(private val binding: ItemPlaylistBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(playlist: Playlist) {
-            val count = playlist.podcastIds.size
+            val count = playlist.podcastCount
             binding.tvListName.text = playlist.name
             binding.tvListCount.text = "$count podcast${if (count != 1) "s" else ""}"
+            binding.btnPlaylistMore.setOnClickListener { onDeleteClick?.invoke(playlist) }
             binding.root.setOnClickListener { onItemClick(playlist) }
         }
     }

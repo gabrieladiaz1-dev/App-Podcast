@@ -72,9 +72,16 @@ class PodcastAdapter(
                 binding.ivThumbnail.setImageResource(R.drawable.ic_audify_logo)
             }
 
-            if (podcast.duration.isNotEmpty()) {
+            if (!podcast.approved) {
+                binding.tvDuration.text = "En revisión"
+                binding.tvDuration.visibility = android.view.View.VISIBLE
+                binding.tvDuration.setTextColor(0xFFD32F2F.toInt())
+                binding.tvDuration.setBackgroundResource(R.drawable.bg_pill_pending)
+            } else if (podcast.duration.isNotEmpty()) {
                 binding.tvDuration.text = podcast.duration
                 binding.tvDuration.visibility = android.view.View.VISIBLE
+                binding.tvDuration.setTextColor(binding.root.context.getColor(R.color.purple))
+                binding.tvDuration.setBackgroundResource(R.drawable.bg_pill)
             } else {
                 binding.tvDuration.visibility = android.view.View.GONE
             }

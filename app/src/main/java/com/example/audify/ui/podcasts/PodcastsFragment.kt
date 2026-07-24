@@ -77,7 +77,7 @@ class PodcastsFragment : Fragment() {
                 val approved = podcasts.count { it.approved }
                 val pending = podcasts.size - approved
                 binding.txtPodcastCount.text = podcasts.size.toString()
-                binding.txtCategoryCount.text = "$approved aprobados"
+                binding.txtCategoryCount.text = "$approved aprobados · $pending pendiente${if (pending != 1) "s" else ""}"
                 binding.txtSectionTitle.text = "Mis podcasts (${podcasts.size})"
                 binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
                 binding.rvUserPodcasts.adapter = PodcastAdapter(podcasts, ::openDetail)
