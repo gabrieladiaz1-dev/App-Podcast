@@ -12,6 +12,7 @@ sdp = "1.1.1"
 ssp = "1.1.1"
 supabase = "2.6.1"
 ktor = "2.3.12"
+supabase-serializer = "2.6.1"
 lifecycle = "2.9.0"
 coroutines = "1.9.0"
 navigation = "2.8.5"
@@ -31,6 +32,7 @@ ssp-android = { group = "com.intuit.ssp", name = "ssp-android", version.ref = "s
 supabase-gotrue = { group = "io.github.jan-tennert.supabase", name = "gotrue-kt", version.ref = "supabase" }
 supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt", version.ref = "supabase" }
 supabase-storage = { group = "io.github.jan-tennert.supabase", name = "storage-kt", version.ref = "supabase" }
+supabase-serializer-jackson = { group = "io.github.jan-tennert.supabase", name = "serializer-jackson", version.ref = "supabase" }
 ktor-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
 ktor-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }

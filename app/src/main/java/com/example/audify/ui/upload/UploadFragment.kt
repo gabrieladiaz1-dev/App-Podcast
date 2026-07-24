@@ -188,7 +188,8 @@ class UploadFragment : Fragment() {
                     Toast.makeText(requireContext(), "No se encontraron categorías. Revisa tu conexión", Toast.LENGTH_LONG).show()
                 }
             } else {
-                Toast.makeText(requireContext(), "No pudimos cargar las categorías. ¿Tienes internet?", Toast.LENGTH_LONG).show()
+                val err = result.exceptionOrNull()
+                Toast.makeText(requireContext(), "Error: ${err?.message ?: "desconocido"}", Toast.LENGTH_LONG).show()
             }
         }
     }

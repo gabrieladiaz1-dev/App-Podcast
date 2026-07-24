@@ -9,9 +9,11 @@ import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.serializer.JacksonSerializer
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
 import io.ktor.client.engine.okhttp.OkHttp
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +32,7 @@ object SupabaseService {
             supabaseUrl = SUPABASE_URL,
             supabaseKey = SUPABASE_KEY
         ) {
+            defaultSerializer = JacksonSerializer()
             install(Auth)
             install(Postgrest)
             install(Storage)
@@ -304,9 +307,15 @@ object SupabaseService {
 
     suspend fun getCategories(): Result<List<Category>> = withContext(Dispatchers.IO) {
         try {
+            Log.d("SupabaseService", "Fetching categories from Supabase...")
             val result = client.postgrest["categories"].select().decodeList<Category>()
+            Log.d("SupabaseService", "Categories loaded: ${result.size} items")
+            for (cat in result) {
+                Log.d("SupabaseService", "  Category: id=${cat.id}, name=${cat.name}")
+            }
             Result.success(result)
         } catch (e: Exception) {
+            Log.e("SupabaseService", "Error fetching categories: ${e.message}", e)
             Result.failure(e)
         }
     }
