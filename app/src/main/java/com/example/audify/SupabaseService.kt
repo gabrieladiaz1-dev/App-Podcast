@@ -272,7 +272,12 @@ object SupabaseService {
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             Log.d("SupabaseService", "Uploading cover to portadas/$path")
-            val result = client.storage.from("portadas").upload(path, imageBytes)
+            val bucket = client.storage.from("portadas")
+            try {
+                bucket.delete(path)
+                Log.d("SupabaseService", "Portada anterior eliminada (si existía)")
+            } catch (_: Exception) {}
+            val result = bucket.upload(path, imageBytes, upsert = false)
             Log.d("SupabaseService", "Cover uploaded: ${result.path}")
             Result.success(result.path)
         } catch (e: Exception) {
@@ -308,9 +313,18 @@ object SupabaseService {
         try {
             Log.d("SupabaseService", "Uploading audio to bucket=$bucketName, path=$path, size=${audioBytes.size}")
             val session = client.auth.currentSessionOrNull()
-            Log.d("SupabaseService", "Session active: ${session != null}, token: ${session?.accessToken?.take(20)}...")
-            val result = client.storage.from(bucketName).upload(path, audioBytes)
-            Log.d("SupabaseService", "Audio uploaded successfully: ${result.path}")
+            if (session == null) {
+                Log.e("SupabaseService", "No hay sesión activa, no se puede subir")
+                return@withContext Result.failure(SessionExpiredException())
+            }
+            Log.d("SupabaseService", "Session active, token=${session.accessToken.take(20)}...")
+            val bucket = client.storage.from(bucketName)
+            try {
+                bucket.delete(path)
+                Log.d("SupabaseService", "Archivo anterior eliminado (si existía)")
+            } catch (_: Exception) {}
+            val result = bucket.upload(path, audioBytes, upsert = false)
+            Log.d("SupabaseService", "Audio uploaded: ${result.path}")
             Result.success(result.path)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error uploading audio: ${e.message}", e)

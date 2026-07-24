@@ -475,28 +475,22 @@ class UploadFragment : Fragment() {
                 }
                 val audioFileNameClean = audioFileName?.replace(Regex("[^a-zA-Z0-9._-]"), "_") ?: "audio.m4a"
                 val audioPath = "${userId}/${UUID.randomUUID()}_$audioFileNameClean"
-                Log.d("UploadFragment", "Subiendo audio a priv/$audioPath")
+                Log.d("UploadFragment", "Subiendo audio a priv/$audioPath (${audioBytes.size} bytes)")
                 val audioResult = withContext(Dispatchers.IO) {
                     SupabaseService.uploadAudio(bucketName = "priv", path = audioPath, audioBytes = audioBytes)
                 }
                 if (audioResult.isFailure) {
                     setLoading(false)
                     val ex = audioResult.exceptionOrNull()
-                    Log.e("UploadFragment", "Error subiendo audio: ${ex?.message}", ex)
-                    val msg = when {
-                        ex?.message?.contains("JWT", true) == true || ex?.message?.contains("expired", true) == true ->
-                            "Tu sesión expiró. Inicia sesión de nuevo"
-                        ex?.message?.contains("RLS", true) == true || ex?.message?.contains("row-level security", true) == true || ex?.message?.contains("403", true) == true ->
-                            "No tienes permiso para subir archivos. Verifica que tengas una sesión activa"
-                        ex?.message?.contains("401", true) == true || ex?.message?.contains("unauthorized", true) == true ->
-                            "No estás autorizado. Inicia sesión de nuevo"
-                        ex?.message?.contains("timed out", true) == true || ex?.message?.contains("timeout", true) == true ->
-                            "Se tardó demasiado. ¿Tienes internet?"
-                        ex?.message?.contains("host", true) == true || ex?.message?.contains("resolve", true) == true ->
-                            "No pudimos conectarnos. Revisa tu internet"
-                        else -> "No pudimos subir el audio: ${ex?.message ?: "error desconocido"}"
+                    val rawError = ex?.message ?: "error desconocido"
+                    Log.e("UploadFragment", "Error subiendo audio: $rawError", ex)
+                    if (ex is SupabaseService.SessionExpiredException) {
+                        Toast.makeText(requireContext(), ex.message, Toast.LENGTH_LONG).show()
+                        SessionManager.clearSession()
+                        startActivity(Intent(requireContext(), LoginActivity::class.java))
+                        return@launch
                     }
-                    showError(msg)
+                    showError("No pudimos subir tu audio. Detalle: $rawError")
                     return@launch
                 }
                 val audioUrl = withContext(Dispatchers.IO) {
