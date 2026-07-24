@@ -3,6 +3,7 @@ package com.example.audify.ui.upload
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.util.Log
 import android.database.Cursor
 import android.media.MediaPlayer
 import android.media.MediaRecorder
@@ -444,7 +445,9 @@ class UploadFragment : Fragment() {
     private fun publishToSupabase() {
         val userId = SessionManager.getUserId()
         if (userId.isNullOrEmpty()) {
-            Toast.makeText(requireContext(), "Parece que no has iniciado sesión. Ingresa de nuevo", Toast.LENGTH_LONG).show()
+            Toast.makeText(requireContext(), "No tienes sesión activa. Inicia sesión para subir podcasts", Toast.LENGTH_LONG).show()
+            SessionManager.clearSession()
+            startActivity(Intent(requireContext(), LoginActivity::class.java))
             return
         }
         val title = binding.edtTitle.text.toString().trim()
@@ -453,6 +456,17 @@ class UploadFragment : Fragment() {
         setLoading(true)
 
         lifecycleScope.launch {
+            val sessionOk = withContext(Dispatchers.IO) {
+                SupabaseService.ensureValidSession()
+            }
+            if (!sessionOk) {
+                setLoading(false)
+                Toast.makeText(requireContext(), "Tu sesión expiró. Inicia sesión de nuevo", Toast.LENGTH_LONG).show()
+                SessionManager.clearSession()
+                startActivity(Intent(requireContext(), LoginActivity::class.java))
+                return@launch
+            }
+
             try {
                 val audioBytes = getAudioBytes() ?: run {
                     setLoading(false)
@@ -461,22 +475,26 @@ class UploadFragment : Fragment() {
                 }
                 val audioFileNameClean = audioFileName?.replace(Regex("[^a-zA-Z0-9._-]"), "_") ?: "audio.m4a"
                 val audioPath = "${userId}/${UUID.randomUUID()}_$audioFileNameClean"
+                Log.d("UploadFragment", "Subiendo audio a priv/$audioPath")
                 val audioResult = withContext(Dispatchers.IO) {
                     SupabaseService.uploadAudio(bucketName = "priv", path = audioPath, audioBytes = audioBytes)
                 }
                 if (audioResult.isFailure) {
                     setLoading(false)
                     val ex = audioResult.exceptionOrNull()
+                    Log.e("UploadFragment", "Error subiendo audio: ${ex?.message}", ex)
                     val msg = when {
-                        ex?.message?.contains("RLS", true) == true ->
-                            "No tienes permiso para subir archivos. Revisa la configuración de tu cuenta"
-                        ex?.message?.contains("row-level security", true) == true ->
-                            "Tu cuenta no tiene permisos para subir archivos. Contacta al administrador"
+                        ex?.message?.contains("JWT", true) == true || ex?.message?.contains("expired", true) == true ->
+                            "Tu sesión expiró. Inicia sesión de nuevo"
+                        ex?.message?.contains("RLS", true) == true || ex?.message?.contains("row-level security", true) == true || ex?.message?.contains("403", true) == true ->
+                            "No tienes permiso para subir archivos. Verifica que tengas una sesión activa"
+                        ex?.message?.contains("401", true) == true || ex?.message?.contains("unauthorized", true) == true ->
+                            "No estás autorizado. Inicia sesión de nuevo"
                         ex?.message?.contains("timed out", true) == true || ex?.message?.contains("timeout", true) == true ->
-                            "Se tardó demasiado la conexión. ¿Tienes internet? Intenta de nuevo"
+                            "Se tardó demasiado. ¿Tienes internet?"
                         ex?.message?.contains("host", true) == true || ex?.message?.contains("resolve", true) == true ->
-                            "No pudimos conectarnos. Revisa tu internet y vuelve a intentar"
-                        else -> "No pudimos subir el audio. Intenta de nuevo"
+                            "No pudimos conectarnos. Revisa tu internet"
+                        else -> "No pudimos subir el audio: ${ex?.message ?: "error desconocido"}"
                     }
                     showError(msg)
                     return@launch

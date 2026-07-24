@@ -271,10 +271,13 @@ object SupabaseService {
         imageBytes: ByteArray
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
+            Log.d("SupabaseService", "Uploading cover to portadas/$path")
             val result = client.storage.from("portadas").upload(path, imageBytes)
+            Log.d("SupabaseService", "Cover uploaded: ${result.path}")
             Result.success(result.path)
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e("SupabaseService", "Error uploading cover: ${e.message}", e)
+            Result.failure(wrapJwtError(e))
         }
     }
 
@@ -303,10 +306,15 @@ object SupabaseService {
         audioBytes: ByteArray
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
+            Log.d("SupabaseService", "Uploading audio to bucket=$bucketName, path=$path, size=${audioBytes.size}")
+            val session = client.auth.currentSessionOrNull()
+            Log.d("SupabaseService", "Session active: ${session != null}, token: ${session?.accessToken?.take(20)}...")
             val result = client.storage.from(bucketName).upload(path, audioBytes)
+            Log.d("SupabaseService", "Audio uploaded successfully: ${result.path}")
             Result.success(result.path)
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e("SupabaseService", "Error uploading audio: ${e.message}", e)
+            Result.failure(wrapJwtError(e))
         }
     }
 
