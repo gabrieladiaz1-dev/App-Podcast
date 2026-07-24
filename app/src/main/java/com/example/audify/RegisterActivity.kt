@@ -3,6 +3,7 @@ package com.example.audify
 import android.content.Intent
 import android.os.Bundle
 import android.text.method.PasswordTransformationMethod
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -123,6 +124,9 @@ class RegisterActivity : AppCompatActivity() {
             SupabaseService.registerUser(pendingEmail, pendingPassword)
                 .onSuccess { userId ->
                     SupabaseService.createProfile(userId, pendingName)
+                        .onFailure {
+                            Log.w("RegisterActivity", "Profile creation failed: ${it.message}")
+                        }
                     Toast.makeText(this@RegisterActivity, "¡Tu cuenta está lista! Ya puedes ingresar", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this@RegisterActivity, LoginActivity::class.java))
                     finish()

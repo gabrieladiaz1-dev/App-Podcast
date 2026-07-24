@@ -15,7 +15,11 @@ import com.example.audify.databinding.ItemPodcastBinding
 import com.example.audify.model.Podcast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PodcastAdapter(
     private val items: List<Podcast>,
@@ -24,23 +28,29 @@ class PodcastAdapter(
 ) : RecyclerView.Adapter<PodcastAdapter.ViewHolder>() {
 
     private val favoriteIds = mutableSetOf<String>()
+    private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     init {
         loadFavorites()
     }
 
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        adapterScope.coroutineContext[Job]?.cancelChildren()
+    }
+
     private fun loadFavorites() {
         val userId = SessionManager.getUserId() ?: return
-        CoroutineScope(Dispatchers.IO).launch {
-            for (podcast in items) {
-                try {
-                    val isFav = SupabaseService.isFavorited(userId, podcast.supabaseId)
-                    if (isFav) favoriteIds.add(podcast.supabaseId)
-                } catch (_: Exception) {}
+        adapterScope.launch {
+            val ids = withContext(Dispatchers.IO) {
+                items.mapNotNull { podcast ->
+                    try {
+                        if (SupabaseService.isFavorited(userId, podcast.supabaseId)) podcast.supabaseId else null
+                    } catch (_: Exception) { null }
+                }.toSet()
             }
-            CoroutineScope(Dispatchers.Main).launch {
-                notifyDataSetChanged()
-            }
+            favoriteIds.addAll(ids)
+            notifyDataSetChanged()
         }
     }
 
@@ -96,32 +106,34 @@ class PodcastAdapter(
                     val userId = SessionManager.getUserId() ?: return@setOnClickListener
                     val podcastIdStr = podcast.supabaseId
                     binding.btnFavorite.isEnabled = false
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val currentlyFav = SupabaseService.isFavorited(userId, podcastIdStr)
-                        val result = if (currentlyFav) {
-                            SupabaseService.removeFavorite(userId, podcastIdStr)
-                        } else {
-                            SupabaseService.addFavorite(
-                                SupabaseService.Favorite(user_id = userId, podcast_id = podcastIdStr)
-                            )
+                    adapterScope.launch {
+                        val currentlyFav = withContext(Dispatchers.IO) {
+                            SupabaseService.isFavorited(userId, podcastIdStr)
                         }
-                        CoroutineScope(Dispatchers.Main).launch {
-                            binding.btnFavorite.isEnabled = true
-                            if (result.isSuccess) {
-                                if (currentlyFav) {
-                                    favoriteIds.remove(podcastIdStr)
-                                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
-                                } else {
-                                    favoriteIds.add(podcastIdStr)
-                                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
-                                }
+                        val result = withContext(Dispatchers.IO) {
+                            if (currentlyFav) {
+                                SupabaseService.removeFavorite(userId, podcastIdStr)
                             } else {
-                                Toast.makeText(
-                                    binding.root.context,
-                                    "No pudimos actualizar el favorito. Intenta de nuevo",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                SupabaseService.addFavorite(
+                                    SupabaseService.Favorite(user_id = userId, podcast_id = podcastIdStr)
+                                )
                             }
+                        }
+                        binding.btnFavorite.isEnabled = true
+                        if (result.isSuccess) {
+                            if (currentlyFav) {
+                                favoriteIds.remove(podcastIdStr)
+                                binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                            } else {
+                                favoriteIds.add(podcastIdStr)
+                                binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
+                            }
+                        } else {
+                            Toast.makeText(
+                                binding.root.context,
+                                "No pudimos actualizar el favorito. Intenta de nuevo",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     }
                     onFavoriteClick?.invoke(podcast)

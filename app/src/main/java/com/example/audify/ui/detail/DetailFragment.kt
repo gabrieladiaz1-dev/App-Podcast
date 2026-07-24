@@ -270,18 +270,24 @@ class DetailFragment : Fragment() {
 
     private fun startSensors() {
         proximitySensor.onNear = {
-            Log.d(TAG, "Near detected → earpiece")
-            service?.setEarpieceMode(true)
+            handler.post {
+                Log.d(TAG, "Near detected → earpiece")
+                service?.setEarpieceMode(true)
+            }
         }
         proximitySensor.onFar = {
-            Log.d(TAG, "Far detected → speaker")
-            service?.setEarpieceMode(false)
+            handler.post {
+                Log.d(TAG, "Far detected → speaker")
+                service?.setEarpieceMode(false)
+            }
         }
         proximitySensor.start()
 
         shakeDetector.onDoubleShake = {
-            Log.d(TAG, "Double shake → toggle play/pause")
-            handler.post { togglePlayPause() }
+            handler.post {
+                Log.d(TAG, "Double shake → toggle play/pause")
+                togglePlayPause()
+            }
         }
         shakeDetector.start()
     }
