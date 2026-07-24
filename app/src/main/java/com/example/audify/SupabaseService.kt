@@ -243,7 +243,8 @@ object SupabaseService {
                 .decodeList<PodcastSupabase>()
             val mapped = result.map { ps ->
                 val profile = getProfileByUserId(ps.user_id)
-                ps.toModel().copy(author = profile?.name ?: "Desconocido")
+                val resolvedCover = resolveCoverUrl(ps.cover_url)
+                ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover)
             }
             Result.success(mapped)
         } catch (e: Exception) {
@@ -260,7 +261,8 @@ object SupabaseService {
                 .decodeList<PodcastSupabase>()
             val profile = getProfileByUserId(userId)
             val mapped = result.map { ps ->
-                ps.toModel().copy(author = profile?.name ?: "Desconocido")
+                val resolvedCover = resolveCoverUrl(ps.cover_url)
+                ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover)
             }
             Result.success(mapped)
         } catch (e: Exception) {
@@ -275,7 +277,8 @@ object SupabaseService {
                 .decodeList<PodcastSupabase>()
             val ps = all.find { it.id.hashCode() == podcastId } ?: return@withContext null
             val profile = getProfileByUserId(ps.user_id)
-            ps.toModel().copy(author = profile?.name ?: "Desconocido")
+            val resolvedCover = resolveCoverUrl(ps.cover_url)
+            ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover)
         } catch (_: Exception) {
             null
         }
@@ -293,7 +296,8 @@ object SupabaseService {
                 .decodeList<PodcastSupabase>()
             val profile = getProfileByUserId(userId)
             val mapped = result.map { ps ->
-                ps.toModel().copy(author = profile?.name ?: "Desconocido")
+                val resolvedCover = resolveCoverUrl(ps.cover_url)
+                ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover)
             }
             Result.success(mapped)
         } catch (e: Exception) {
@@ -419,7 +423,8 @@ object SupabaseService {
                     if (list.isNotEmpty()) {
                         val ps = list.first()
                         val profile = getProfileByUserId(ps.user_id)
-                        podcasts.add(ps.toModel().copy(author = profile?.name ?: "Desconocido"))
+                        val resolvedCover = resolveCoverUrl(ps.cover_url)
+                        podcasts.add(ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover))
                     }
                 } catch (e: Exception) {
                     Log.e("SupabaseService", "Error cargando podcast favorito ${fav.podcast_id}: ${e.message}")
@@ -521,6 +526,18 @@ object SupabaseService {
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error generando signed URL: ${e.message}")
             audioUrl
+        }
+    }
+
+    suspend fun resolveCoverUrl(coverUrl: String?): String? {
+        if (coverUrl.isNullOrEmpty()) return null
+        if (!coverUrl.startsWith("http")) return coverUrl
+        return try {
+            val (bucket, path) = extractStoragePath(coverUrl)
+            createSignedUrl(bucket, path)
+        } catch (e: Exception) {
+            Log.e("SupabaseService", "Error generando signed URL cover: ${e.message}")
+            coverUrl
         }
     }
 }

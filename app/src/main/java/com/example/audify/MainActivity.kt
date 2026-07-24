@@ -6,6 +6,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.example.audify.databinding.ActivityMainBinding
@@ -32,37 +33,58 @@ class MainActivity : AppCompatActivity() {
 
         binding.bottomNavigation.setupWithNavController(navController)
 
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            val builder = NavOptions.Builder()
+                .setLaunchSingleTop(true)
+            if (item.itemId == R.id.inicioFragment) {
+                builder.setPopUpTo(R.id.inicioFragment, true)
+            } else {
+                builder.setPopUpTo(R.id.inicioFragment, false)
+            }
+            try {
+                navController.navigate(item.itemId, null, builder.build())
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+
         loadDrawerUserData()
 
         binding.navigationView.setNavigationItemSelectedListener { item ->
+            val navOptions = NavOptions.Builder()
+                .setPopUpTo(R.id.nav_graph, true)
+                .setLaunchSingleTop(true)
+                .build()
+
             when (item.itemId) {
-                R.id.nav_inicio -> navController.navigate(R.id.inicioFragment)
+                R.id.nav_inicio -> navController.navigate(R.id.inicioFragment, null, navOptions)
                 R.id.nav_subir -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
                     } else {
-                        navController.navigate(R.id.uploadFragment)
+                        navController.navigate(R.id.uploadFragment, null, navOptions)
                     }
                 }
                 R.id.nav_favoritos -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
                     } else {
-                        navController.navigate(R.id.favoritesFragment)
+                        navController.navigate(R.id.favoritesFragment, null, navOptions)
                     }
                 }
                 R.id.nav_listas -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
                     } else {
-                        navController.navigate(R.id.listsFragment)
+                        navController.navigate(R.id.listsFragment, null, navOptions)
                     }
                 }
                 R.id.nav_borradores -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
                     } else {
-                        navController.navigate(R.id.draftsFragment)
+                        navController.navigate(R.id.draftsFragment, null, navOptions)
                     }
                 }
                 R.id.nav_cerrar_sesion -> {
