@@ -121,6 +121,7 @@ class UploadFragment : Fragment() {
 
         if (!SessionManager.isLoggedIn()) {
             startActivity(Intent(requireContext(), LoginActivity::class.java))
+            requireActivity().finish()
             return
         }
 
@@ -185,6 +186,7 @@ class UploadFragment : Fragment() {
                 Toast.makeText(requireContext(), "Tu sesión expiró, por favor inicia sesión de nuevo", Toast.LENGTH_LONG).show()
                 SessionManager.clearSession()
                 startActivity(Intent(requireContext(), LoginActivity::class.java))
+                requireActivity().finish()
                 return@launch
             }
             val result = withContext(Dispatchers.IO) {
@@ -204,6 +206,7 @@ class UploadFragment : Fragment() {
                     Toast.makeText(requireContext(), err.message, Toast.LENGTH_LONG).show()
                     SessionManager.clearSession()
                     startActivity(Intent(requireContext(), LoginActivity::class.java))
+                    requireActivity().finish()
                 } else {
                     Toast.makeText(requireContext(), "No pudimos cargar las categorías. Intenta de nuevo", Toast.LENGTH_LONG).show()
                 }
@@ -448,6 +451,7 @@ class UploadFragment : Fragment() {
             Toast.makeText(requireContext(), "No tienes sesión activa. Inicia sesión para subir podcasts", Toast.LENGTH_LONG).show()
             SessionManager.clearSession()
             startActivity(Intent(requireContext(), LoginActivity::class.java))
+            requireActivity().finish()
             return
         }
         val title = binding.edtTitle.text.toString().trim()
@@ -464,6 +468,7 @@ class UploadFragment : Fragment() {
                 Toast.makeText(requireContext(), "Tu sesión expiró. Inicia sesión de nuevo", Toast.LENGTH_LONG).show()
                 SessionManager.clearSession()
                 startActivity(Intent(requireContext(), LoginActivity::class.java))
+                requireActivity().finish()
                 return@launch
             }
 
@@ -488,6 +493,7 @@ class UploadFragment : Fragment() {
                         Toast.makeText(requireContext(), ex.message, Toast.LENGTH_LONG).show()
                         SessionManager.clearSession()
                         startActivity(Intent(requireContext(), LoginActivity::class.java))
+                        requireActivity().finish()
                         return@launch
                     }
                     showError("No pudimos subir tu audio. Detalle: $rawError")

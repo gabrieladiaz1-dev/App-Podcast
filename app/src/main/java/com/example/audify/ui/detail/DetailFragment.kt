@@ -11,6 +11,7 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.Navigation
 import com.example.audify.R
 import com.example.audify.SessionManager
 import com.example.audify.SupabaseService
@@ -104,7 +105,15 @@ class DetailFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.btnBack.setOnClickListener {
-            requireActivity().onBackPressedDispatcher.onBackPressed()
+            Navigation.findNavController(requireView()).popBackStack()
+        }
+
+        binding.txtAuthor.setOnClickListener {
+            val p = podcast ?: return@setOnClickListener
+            if (p.userId.isNotEmpty()) {
+                val bundle = Bundle().apply { putString("userId", p.userId) }
+                Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
+            }
         }
 
         binding.btnFavorite.setOnClickListener {

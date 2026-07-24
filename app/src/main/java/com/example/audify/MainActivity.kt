@@ -6,8 +6,8 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
-import androidx.navigation.ui.setupWithNavController
 import com.example.audify.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     lateinit var binding: ActivityMainBinding
+    private lateinit var navController: NavController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,15 +29,29 @@ class MainActivity : AppCompatActivity() {
 
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        val navController = navHostFragment.navController
+        navController = navHostFragment.navController
 
-        binding.bottomNavigation.setupWithNavController(navController)
+        navController.addOnDestinationChangedListener { _, dest, _ ->
+            val menu = binding.bottomNavigation.menu
+            for (i in 0 until menu.size()) {
+                menu.getItem(i).isChecked = menu.getItem(i).itemId == dest.id
+            }
+        }
+
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            val destId = item.itemId
+            navController.popBackStack(navController.graph.startDestinationId, false)
+            if (destId != navController.currentDestination?.id) {
+                navController.navigate(destId)
+            }
+            true
+        }
 
         loadDrawerUserData()
 
         binding.navigationView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
-                R.id.nav_inicio -> navController.navigate(R.id.inicioFragment)
+                R.id.nav_inicio -> navigateToBottomNav(R.id.inicioFragment)
                 R.id.nav_subir -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
@@ -48,7 +63,7 @@ class MainActivity : AppCompatActivity() {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
                     } else {
-                        navController.navigate(R.id.favoritesFragment)
+                        navigateToBottomNav(R.id.favoritesFragment)
                     }
                 }
                 R.id.nav_listas -> {
@@ -78,6 +93,13 @@ class MainActivity : AppCompatActivity() {
             }
             binding.drawerLayout.closeDrawer(GravityCompat.START)
             true
+        }
+    }
+
+    private fun navigateToBottomNav(destId: Int) {
+        navController.popBackStack(navController.graph.startDestinationId, false)
+        if (navController.currentDestination?.id != destId) {
+            navController.navigate(destId)
         }
     }
 

@@ -43,6 +43,7 @@ class FavoritesFragment : Fragment() {
 
         if (!SessionManager.isLoggedIn()) {
             startActivity(Intent(requireContext(), LoginActivity::class.java))
+            requireActivity().finish()
             return
         }
 
