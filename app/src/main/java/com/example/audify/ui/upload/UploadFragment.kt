@@ -532,7 +532,7 @@ class UploadFragment : Fragment() {
             .setTitle("Error")
             .setIcon(R.drawable.ic_error)
             .setMessage(message)
-            .setPositiveButton("Reintentar", null)
+            .setPositiveButton("Reintentar") { _, _ -> publishToSupabase() }
             .setNegativeButton("Cancelar") { _, _ -> resetForm() }
             .show()
     }

@@ -55,7 +55,6 @@ class UserProfileFragment : Fragment() {
             val displayName = profile.name.ifEmpty { "Usuario" }
             binding.txtAvatar.text = displayName.firstOrNull()?.uppercase() ?: "?"
             binding.txtNombre.text = displayName
-            binding.txtUsername.text = "@${profile.username.ifEmpty { "usuario" }}"
             binding.txtPodcastCount.text = "0"
             binding.txtCategoryCount.text = "0"
             binding.txtSectionTitle.text = "Podcasts (0)"

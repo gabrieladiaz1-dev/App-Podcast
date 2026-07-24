@@ -90,7 +90,6 @@ object SupabaseService {
     data class Profile(
         val id: String = "",
         val name: String = "",
-        val username: String = "",
         val avatar_url: String? = null,
         val created_at: String? = null
     )
@@ -129,51 +128,6 @@ object SupabaseService {
         }
     }
 
-    suspend fun updateProfileName(name: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val userId = client.auth.currentUserOrNull()?.id ?: error("Usuario no autenticado")
-            client.postgrest["profiles"].update(
-                mapOf("name" to name)
-            ) {
-                filter {
-                    eq("id", userId)
-                }
-            }
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun isUsernameAvailable(username: String): Result<Boolean> = withContext(Dispatchers.IO) {
-        try {
-            val userId = client.auth.currentUserOrNull()?.id
-            val profiles = client.postgrest["profiles"]
-                .select {
-                    filter { eq("username", username) }
-                }
-                .decodeList<Profile>()
-            val taken = profiles.any { it.id != userId }
-            Result.success(!taken)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun updateUsername(username: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val userId = client.auth.currentUserOrNull()?.id ?: error("Usuario no autenticado")
-            client.postgrest["profiles"].update(
-                mapOf("username" to username)
-            ) {
-                filter { eq("id", userId) }
-            }
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
     suspend fun getProfileByUserId(userId: String): Profile? = withContext(Dispatchers.IO) {
         try {
             val profiles = client.postgrest["profiles"]
@@ -184,6 +138,20 @@ object SupabaseService {
             profiles.firstOrNull()
         } catch (e: Exception) {
             null
+        }
+    }
+
+    suspend fun updateProfileName(name: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val userId = client.auth.currentUserOrNull()?.id ?: error("Usuario no autenticado")
+            client.postgrest["profiles"].update(
+                mapOf("name" to name)
+            ) {
+                filter { eq("id", userId) }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
@@ -201,13 +169,15 @@ object SupabaseService {
     suspend fun loginUser(
         email: String,
         password: String
-    ): Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<String> = withContext(Dispatchers.IO) {
         try {
             client.auth.signInWith(Email) {
                 this.email = email
                 this.password = password
             }
-            Result.success(Unit)
+            val userId = client.auth.currentUserOrNull()?.id
+                ?: error("No se pudo obtener el ID del usuario")
+            Result.success(userId)
         } catch (e: Exception) {
             Result.failure(e)
         }
