@@ -187,9 +187,7 @@ class DetailFragment : Fragment() {
                 val result = if (isFav) {
                     SupabaseService.removeFavorite(userId, podcastIdStr)
                 } else {
-                    SupabaseService.addFavorite(
-                        SupabaseService.Favorite(user_id = userId, podcast_id = podcastIdStr)
-                    )
+                    SupabaseService.addFavorite(userId, podcastIdStr)
                 }
                 binding.btnFavorite.isEnabled = true
                 if (result.isSuccess) {

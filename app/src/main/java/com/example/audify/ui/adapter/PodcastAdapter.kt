@@ -1,6 +1,7 @@
 package com.example.audify.ui.adapter
 
 import android.content.Intent
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.Toast
@@ -114,9 +115,7 @@ class PodcastAdapter(
                             if (currentlyFav) {
                                 SupabaseService.removeFavorite(userId, podcastIdStr)
                             } else {
-                                SupabaseService.addFavorite(
-                                    SupabaseService.Favorite(user_id = userId, podcast_id = podcastIdStr)
-                                )
+                                SupabaseService.addFavorite(userId, podcastIdStr)
                             }
                         }
                         binding.btnFavorite.isEnabled = true
@@ -129,11 +128,21 @@ class PodcastAdapter(
                                 binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
                             }
                         } else {
-                            Toast.makeText(
-                                binding.root.context,
-                                "No pudimos actualizar el favorito. Intenta de nuevo",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            val err = result.exceptionOrNull()
+                            if (err is SupabaseService.SessionExpiredException) {
+                                Toast.makeText(
+                                    binding.root.context,
+                                    "Tu sesión expiró. Inicia sesión de nuevo.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Log.e("PodcastAdapter", "Error favorito: ${err?.message}", err)
+                                Toast.makeText(
+                                    binding.root.context,
+                                    "No pudimos actualizar el favorito. Intenta de nuevo",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     }
                     onFavoriteClick?.invoke(podcast)

@@ -366,10 +366,29 @@ object SupabaseService {
         val created_at: String? = null
     )
 
-    suspend fun addFavorite(favorite: Favorite): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun addFavorite(userId: String, podcastId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["favorites"].insert(favorite)
-            Log.d("SupabaseService", "Favorito agregado: user=${favorite.user_id} podcast=${favorite.podcast_id}")
+            val session = client.auth.currentSessionOrNull()
+            if (session == null) {
+                Log.e("SupabaseService", "addFavorite: no hay sesión activa")
+                return@withContext Result.failure(SessionExpiredException())
+            }
+            val existing = client.postgrest["favorites"]
+                .select {
+                    filter {
+                        eq("user_id", userId)
+                        eq("podcast_id", podcastId)
+                    }
+                }
+                .decodeList<Favorite>()
+            if (existing.isNotEmpty()) {
+                Log.d("SupabaseService", "addFavorite: ya existe, no se duplica")
+                return@withContext Result.success(Unit)
+            }
+            client.postgrest["favorites"].insert(
+                mapOf("user_id" to userId, "podcast_id" to podcastId)
+            )
+            Log.d("SupabaseService", "Favorito agregado: user=$userId podcast=$podcastId")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error agregando favorito: ${e.message}", e)
@@ -379,6 +398,11 @@ object SupabaseService {
 
     suspend fun removeFavorite(userId: String, podcastId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            val session = client.auth.currentSessionOrNull()
+            if (session == null) {
+                Log.e("SupabaseService", "removeFavorite: no hay sesión activa")
+                return@withContext Result.failure(SessionExpiredException())
+            }
             client.postgrest["favorites"].delete {
                 filter {
                     eq("user_id", userId)

@@ -41,6 +41,7 @@ No real tests exist (only auto-generated stubs). No lint/typecheck configured.
 - **Storage buckets:** `priv` (uploaded audio, private), `pod` (approved podcast audio, public), `covers` (images, public). `resolveAudioUrl()` tries to copy from `priv` to `pod` via `moveAudioFromPrivToPod()`, falls back to original URL.
 - **Signatures:** Audio for approved podcasts uses `createSignedUrl()` with 60 min expiry.
 - **Profile INSERT** requires RLS policy: `create policy "..." on profiles for insert with check (auth.uid() = id)`
+- **Favorites table** requires: `CREATE TABLE IF NOT EXISTS favorites (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, podcast_id TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now(), UNIQUE(user_id, podcast_id))` + RLS policies for INSERT/DELETE/SELECT on `authenticated` role with `auth.uid() = user_id`.
 
 ### Data layer
 - **`SupabaseService.kt`** — singleton, hardcoded Supabase URL + anon key (public). All DB calls use `withContext(Dispatchers.IO)`. Provides: auth, profile CRUD, podcasts query/insert, favorites CRUD, playlists CRUD, categories, file upload/download, signed URLs.
