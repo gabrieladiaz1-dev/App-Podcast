@@ -2,6 +2,7 @@ package com.example.audify
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.gotrue.Auth
@@ -13,7 +14,6 @@ import io.github.jan.supabase.serializer.JacksonSerializer
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
 import io.ktor.client.engine.okhttp.OkHttp
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -79,6 +79,10 @@ object SupabaseService {
         } catch (_: Exception) {
             false
         }
+    }
+
+    suspend fun getCurrentUserId(): String? {
+        return client.auth.currentUserOrNull()?.id
     }
 
     suspend fun registerUser(
@@ -203,7 +207,7 @@ object SupabaseService {
         }
     }
 
-    data class Podcast(
+    data class PodcastSupabase(
         val id: String = "",
         val user_id: String = "",
         val title: String = "",
@@ -215,27 +219,81 @@ object SupabaseService {
         val created_at: String = ""
     )
 
-    suspend fun getApprovedPodcasts(): Result<List<Podcast>> = withContext(Dispatchers.IO) {
+    private fun PodcastSupabase.toModel(): com.example.audify.model.Podcast {
+        return com.example.audify.model.Podcast(
+            id = this.id.hashCode(),
+            title = this.title,
+            author = "",
+            description = this.description,
+            duration = "",
+            category = "",
+            audioUrl = this.audio_url,
+            coverUrl = this.cover_url,
+            userId = this.user_id,
+            approved = this.approved
+        )
+    }
+
+    suspend fun getAllPodcasts(): Result<List<com.example.audify.model.Podcast>> = withContext(Dispatchers.IO) {
         try {
             val result = client.postgrest["podcasts"]
-                .select {
-                    filter { eq("approved", true) }
-                }
-                .decodeList<Podcast>()
-            Result.success(result)
+                .select { filter { eq("approved", true) } }
+                .decodeList<PodcastSupabase>()
+            val mapped = result.map { ps ->
+                val profile = getProfileByUserId(ps.user_id)
+                ps.toModel().copy(author = profile?.name ?: "Desconocido")
+            }
+            Result.success(mapped)
         } catch (e: Exception) {
             Result.failure(wrapJwtError(e))
         }
     }
 
-    suspend fun getPodcastsByUserId(userId: String): Result<List<Podcast>> = withContext(Dispatchers.IO) {
+    suspend fun getUserPodcasts(): Result<List<com.example.audify.model.Podcast>> = withContext(Dispatchers.IO) {
+        try {
+            val userId = client.auth.currentUserOrNull()?.id
+                ?: return@withContext Result.failure(Exception("No autenticado"))
+            val result = client.postgrest["podcasts"]
+                .select { filter { eq("user_id", userId) } }
+                .decodeList<PodcastSupabase>()
+            val profile = getProfileByUserId(userId)
+            val mapped = result.map { ps ->
+                ps.toModel().copy(author = profile?.name ?: "Desconocido")
+            }
+            Result.success(mapped)
+        } catch (e: Exception) {
+            Result.failure(wrapJwtError(e))
+        }
+    }
+
+    suspend fun getPodcastByIntId(podcastId: Int): com.example.audify.model.Podcast? = withContext(Dispatchers.IO) {
+        try {
+            val all = client.postgrest["podcasts"]
+                .select()
+                .decodeList<PodcastSupabase>()
+            val ps = all.find { it.id.hashCode() == podcastId } ?: return@withContext null
+            val profile = getProfileByUserId(ps.user_id)
+            ps.toModel().copy(author = profile?.name ?: "Desconocido")
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    suspend fun getPodcastsByUser(userId: String): Result<List<com.example.audify.model.Podcast>> = withContext(Dispatchers.IO) {
         try {
             val result = client.postgrest["podcasts"]
                 .select {
-                    filter { eq("user_id", userId) }
+                    filter {
+                        eq("user_id", userId)
+                        eq("approved", true)
+                    }
                 }
-                .decodeList<Podcast>()
-            Result.success(result)
+                .decodeList<PodcastSupabase>()
+            val profile = getProfileByUserId(userId)
+            val mapped = result.map { ps ->
+                ps.toModel().copy(author = profile?.name ?: "Desconocido")
+            }
+            Result.success(mapped)
         } catch (e: Exception) {
             Result.failure(wrapJwtError(e))
         }
@@ -271,17 +329,11 @@ object SupabaseService {
         imageBytes: ByteArray
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            Log.d("SupabaseService", "Uploading cover to portadas/$path")
             val bucket = client.storage.from("portadas")
-            try {
-                bucket.delete(path)
-                Log.d("SupabaseService", "Portada anterior eliminada (si existía)")
-            } catch (_: Exception) {}
+            try { bucket.delete(path) } catch (_: Exception) {}
             val result = bucket.upload(path, imageBytes, upsert = false)
-            Log.d("SupabaseService", "Cover uploaded: ${result.path}")
             Result.success(result.path)
         } catch (e: Exception) {
-            Log.e("SupabaseService", "Error uploading cover: ${e.message}", e)
             Result.failure(wrapJwtError(e))
         }
     }
@@ -305,29 +357,81 @@ object SupabaseService {
         }
     }
 
+    suspend fun removeFavorite(userId: String, podcastId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            client.postgrest["favorites"].delete {
+                filter {
+                    eq("user_id", userId)
+                    eq("podcast_id", podcastId)
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(wrapJwtError(e))
+        }
+    }
+
+    suspend fun isFavorited(userId: String, podcastId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val result = client.postgrest["favorites"]
+                .select {
+                    filter {
+                        eq("user_id", userId)
+                        eq("podcast_id", podcastId)
+                    }
+                }
+                .decodeList<Favorite>()
+            result.isNotEmpty()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    suspend fun getFavoritePodcasts(userId: String): Result<List<com.example.audify.model.Podcast>> = withContext(Dispatchers.IO) {
+        try {
+            val favs = client.postgrest["favorites"]
+                .select { filter { eq("user_id", userId) } }
+                .decodeList<Favorite>()
+            if (favs.isEmpty()) return@withContext Result.success(emptyList())
+            val podcasts = mutableListOf<com.example.audify.model.Podcast>()
+            for (fav in favs) {
+                try {
+                    val list = client.postgrest["podcasts"]
+                        .select {
+                            filter {
+                                eq("id", fav.podcast_id)
+                                eq("approved", true)
+                            }
+                        }
+                        .decodeList<PodcastSupabase>()
+                    if (list.isNotEmpty()) {
+                        val ps = list.first()
+                        val profile = getProfileByUserId(ps.user_id)
+                        podcasts.add(ps.toModel().copy(author = profile?.name ?: "Desconocido"))
+                    }
+                } catch (_: Exception) {}
+            }
+            Result.success(podcasts)
+        } catch (e: Exception) {
+            Result.failure(wrapJwtError(e))
+        }
+    }
+
     suspend fun uploadAudio(
         bucketName: String = "priv",
         path: String,
         audioBytes: ByteArray
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            Log.d("SupabaseService", "Uploading audio to bucket=$bucketName, path=$path, size=${audioBytes.size}")
             val session = client.auth.currentSessionOrNull()
             if (session == null) {
-                Log.e("SupabaseService", "No hay sesión activa, no se puede subir")
                 return@withContext Result.failure(SessionExpiredException())
             }
-            Log.d("SupabaseService", "Session active, token=${session.accessToken.take(20)}...")
             val bucket = client.storage.from(bucketName)
-            try {
-                bucket.delete(path)
-                Log.d("SupabaseService", "Archivo anterior eliminado (si existía)")
-            } catch (_: Exception) {}
+            try { bucket.delete(path) } catch (_: Exception) {}
             val result = bucket.upload(path, audioBytes, upsert = false)
-            Log.d("SupabaseService", "Audio uploaded: ${result.path}")
             Result.success(result.path)
         } catch (e: Exception) {
-            Log.e("SupabaseService", "Error uploading audio: ${e.message}", e)
             Result.failure(wrapJwtError(e))
         }
     }
@@ -335,7 +439,7 @@ object SupabaseService {
     fun readUriToBytes(context: Context, uri: Uri): ByteArray? {
         return try {
             context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -356,15 +460,9 @@ object SupabaseService {
 
     suspend fun getCategories(): Result<List<Category>> = withContext(Dispatchers.IO) {
         try {
-            Log.d("SupabaseService", "Fetching categories from Supabase...")
             val result = client.postgrest["categories"].select().decodeList<Category>()
-            Log.d("SupabaseService", "Categories loaded: ${result.size} items")
-            for (cat in result) {
-                Log.d("SupabaseService", "  Category: id=${cat.id}, name=${cat.name}")
-            }
             Result.success(result)
         } catch (e: Exception) {
-            Log.e("SupabaseService", "Error fetching categories: ${e.message}", e)
             Result.failure(wrapJwtError(e))
         }
     }

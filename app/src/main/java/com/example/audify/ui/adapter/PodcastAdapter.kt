@@ -8,15 +8,39 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.audify.LoginActivity
 import com.example.audify.R
 import com.example.audify.SessionManager
-import com.example.audify.data.MockData
+import com.example.audify.SupabaseService
 import com.example.audify.databinding.ItemPodcastBinding
 import com.example.audify.model.Podcast
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class PodcastAdapter(
     private val items: List<Podcast>,
     private val onItemClick: ((Podcast) -> Unit)? = null,
     private val onFavoriteClick: ((Podcast) -> Unit)? = null
 ) : RecyclerView.Adapter<PodcastAdapter.ViewHolder>() {
+
+    private val favoriteIds = mutableSetOf<String>()
+
+    init {
+        loadFavorites()
+    }
+
+    private fun loadFavorites() {
+        val userId = SessionManager.getUserId() ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            for (podcast in items) {
+                try {
+                    val isFav = SupabaseService.isFavorited(userId, podcast.id.toString())
+                    if (isFav) favoriteIds.add(podcast.id.toString())
+                } catch (_: Exception) {}
+            }
+            CoroutineScope(Dispatchers.Main).launch {
+                notifyDataSetChanged()
+            }
+        }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemPodcastBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -34,21 +58,41 @@ class PodcastAdapter(
             binding.tvTitle.text = podcast.title
             binding.tvAuthor.text = podcast.author
             binding.tvDescription.text = podcast.description
-            binding.tvDuration.text = podcast.duration
+
+            if (podcast.duration.isNotEmpty()) {
+                binding.tvDuration.text = podcast.duration
+                binding.tvDuration.visibility = android.view.View.VISIBLE
+            } else {
+                binding.tvDuration.visibility = android.view.View.GONE
+            }
 
             if (SessionManager.isLoggedIn()) {
-                val isFav = MockData.isFavorite(podcast.id)
+                val isFav = favoriteIds.contains(podcast.id.toString())
                 binding.btnFavorite.setImageResource(
                     if (isFav) R.drawable.ic_favorite
                     else R.drawable.ic_favorite_border
                 )
                 binding.btnFavorite.setOnClickListener {
-                    MockData.toggleFavorite(podcast.id)
-                    val nowFav = MockData.isFavorite(podcast.id)
-                    binding.btnFavorite.setImageResource(
-                        if (nowFav) R.drawable.ic_favorite
-                        else R.drawable.ic_favorite_border
-                    )
+                    val userId = SessionManager.getUserId() ?: return@setOnClickListener
+                    val podcastIdStr = podcast.id.toString()
+                    if (isFav) {
+                        favoriteIds.remove(podcastIdStr)
+                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                        CoroutineScope(Dispatchers.IO).launch {
+                            SupabaseService.removeFavorite(userId, podcastIdStr)
+                        }
+                    } else {
+                        favoriteIds.add(podcastIdStr)
+                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
+                        CoroutineScope(Dispatchers.IO).launch {
+                            SupabaseService.addFavorite(
+                                SupabaseService.Favorite(
+                                    user_id = userId,
+                                    podcast_id = podcastIdStr
+                                )
+                            )
+                        }
+                    }
                     onFavoriteClick?.invoke(podcast)
                 }
             } else {

@@ -12,7 +12,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.R
 import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentUserProfileBinding
-import com.example.audify.ui.adapter.CategoryAdapter
 import com.example.audify.ui.adapter.PodcastAdapter
 import kotlinx.coroutines.launch
 
@@ -55,13 +54,25 @@ class UserProfileFragment : Fragment() {
             val displayName = profile.name.ifEmpty { "Usuario" }
             binding.txtAvatar.text = displayName.firstOrNull()?.uppercase() ?: "?"
             binding.txtNombre.text = displayName
-            binding.txtPodcastCount.text = "0"
-            binding.txtCategoryCount.text = "0"
-            binding.txtSectionTitle.text = "Podcasts (0)"
-            binding.txtEmpty.visibility = View.VISIBLE
-            binding.rvCategories.adapter = CategoryAdapter(emptyList())
-            binding.rvUserPodcasts.adapter = PodcastAdapter(emptyList())
+
+            val podcastsResult = SupabaseService.getPodcastsByUser(userId)
+            val podcasts = if (podcastsResult.isSuccess) podcastsResult.getOrNull() ?: emptyList() else emptyList()
+            binding.txtPodcastCount.text = podcasts.size.toString()
+            binding.txtSectionTitle.text = "Podcasts (${podcasts.size})"
+            binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
+            binding.rvUserPodcasts.adapter = PodcastAdapter(podcasts, ::openDetail)
+
+            if (podcasts.isEmpty()) {
+                binding.txtEmpty.visibility = View.VISIBLE
+            } else {
+                binding.txtEmpty.visibility = View.GONE
+            }
         }
+    }
+
+    private fun openDetail(podcast: com.example.audify.model.Podcast) {
+        val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
+        Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
     }
 
     override fun onDestroyView() {

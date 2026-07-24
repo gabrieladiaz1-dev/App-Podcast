@@ -3,7 +3,6 @@ package com.example.audify
 import android.content.Intent
 import android.os.Bundle
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
@@ -38,6 +37,13 @@ class MainActivity : AppCompatActivity() {
         binding.navigationView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_inicio -> navController.navigate(R.id.inicioFragment)
+                R.id.nav_subir -> {
+                    if (!SessionManager.isLoggedIn()) {
+                        startActivity(Intent(this, LoginActivity::class.java))
+                    } else {
+                        navController.navigate(R.id.uploadFragment)
+                    }
+                }
                 R.id.nav_favoritos -> {
                     if (!SessionManager.isLoggedIn()) {
                         startActivity(Intent(this, LoginActivity::class.java))
@@ -83,8 +89,8 @@ class MainActivity : AppCompatActivity() {
 
         if (!SessionManager.isLoggedIn()) {
             txtAvatar.text = "?"
-            txtNombre.text = getString(R.string.drawer_user_name)
-            txtCorreo.text = getString(R.string.drawer_user_email)
+            txtNombre.text = "Invitado"
+            txtCorreo.text = "inicia sesión para ver tu perfil"
             return
         }
 

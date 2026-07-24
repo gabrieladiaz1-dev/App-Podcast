@@ -10,10 +10,13 @@ import android.view.ViewGroup
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.example.audify.R
+import com.example.audify.SessionManager
+import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentDetailBinding
 import com.example.audify.model.Podcast
-import com.example.audify.data.MockData
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -57,31 +60,46 @@ class DetailFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val podcastId = arguments?.getInt("podcastId", -1) ?: -1
-        podcast = MockData.getPodcasts().find { it.id == podcastId }
-        if (podcast == null) {
+        if (podcastId == -1) {
             Toast.makeText(requireContext(), "No encontramos ese podcast", Toast.LENGTH_SHORT).show()
             requireActivity().onBackPressedDispatcher.onBackPressed()
             return
         }
 
-        bindPodcast()
-        setupClickListeners()
-        initMediaPlayer()
+        binding.progressBar.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            podcast = SupabaseService.getPodcastByIntId(podcastId)
+            binding.progressBar.visibility = View.GONE
+
+            if (podcast == null) {
+                Toast.makeText(requireContext(), "No encontramos ese podcast", Toast.LENGTH_SHORT).show()
+                requireActivity().onBackPressedDispatcher.onBackPressed()
+                return@launch
+            }
+
+            bindPodcast()
+            setupClickListeners()
+            initMediaPlayer()
+        }
     }
 
     private fun bindPodcast() {
         val p = podcast ?: return
-        binding.txtCoverLetter.text = p.title.first().uppercase()
+        binding.txtCoverLetter.text = p.title.firstOrNull()?.uppercase() ?: "?"
         binding.txtTitle.text = p.title
         binding.txtAuthor.text = p.author
-        binding.txtCategory.text = p.category
+        binding.txtCategory.text = p.category.ifEmpty { "General" }
         binding.txtDescription.text = p.description
-        binding.txtTotalTime.text = p.duration
 
-        val isFav = MockData.getFavoriteIds().contains(p.id)
-        binding.btnFavorite.setImageResource(
-            if (isFav) R.drawable.ic_favorite else R.drawable.ic_favorite_border
-        )
+        val userId = SessionManager.getUserId()
+        if (userId != null) {
+            lifecycleScope.launch {
+                val isFav = SupabaseService.isFavorited(userId, p.id.toString())
+                binding.btnFavorite.setImageResource(
+                    if (isFav) R.drawable.ic_favorite else R.drawable.ic_favorite_border
+                )
+            }
+        }
     }
 
     private fun setupClickListeners() {
@@ -90,12 +108,23 @@ class DetailFragment : Fragment() {
         }
 
         binding.btnFavorite.setOnClickListener {
-            podcast?.let { p ->
-                MockData.toggleFavorite(p.id)
-                val isFav = MockData.getFavoriteIds().contains(p.id)
-                binding.btnFavorite.setImageResource(
-                    if (isFav) R.drawable.ic_favorite else R.drawable.ic_favorite_border
-                )
+            val p = podcast ?: return@setOnClickListener
+            val userId = SessionManager.getUserId() ?: run {
+                Toast.makeText(requireContext(), "Ingresa para guardar favoritos", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val podcastIdStr = p.id.toString()
+            lifecycleScope.launch {
+                val isFav = SupabaseService.isFavorited(userId, podcastIdStr)
+                if (isFav) {
+                    SupabaseService.removeFavorite(userId, podcastIdStr)
+                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                } else {
+                    SupabaseService.addFavorite(
+                        SupabaseService.Favorite(user_id = userId, podcast_id = podcastIdStr)
+                    )
+                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
+                }
             }
         }
 
@@ -117,13 +146,16 @@ class DetailFragment : Fragment() {
 
     private fun initMediaPlayer() {
         val url = podcast?.audioUrl ?: return
-        if (url.isEmpty()) return
+        if (url.isEmpty()) {
+            Toast.makeText(requireContext(), "Este podcast no tiene audio disponible", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         try {
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(url)
                 setOnPreparedListener { mp ->
-                    isPrepared = true
+                    this@DetailFragment.isPrepared = true
                     binding.seekBar.max = mp.duration
                     binding.txtTotalTime.text = formatTime(mp.duration)
                 }
@@ -133,7 +165,7 @@ class DetailFragment : Fragment() {
                     binding.seekBar.progress = 0
                     binding.txtCurrentTime.text = "00:00"
                 }
-                setOnErrorListener { _, what, extra ->
+                setOnErrorListener { _, _, _ ->
                     this@DetailFragment.isPrepared = false
                     binding.btnPlayPause.setImageResource(R.drawable.ic_play)
                     true
@@ -186,9 +218,5 @@ class DetailFragment : Fragment() {
         isPrepared = false
         isPlaying = false
         _binding = null
-    }
-
-    companion object {
-        private const val TAG = "DetailFragment"
     }
 }

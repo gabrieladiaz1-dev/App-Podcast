@@ -63,8 +63,6 @@ class ProfileFragment : Fragment() {
     }
 
     private fun setupClickListeners() {
-        binding.btnBack.setOnClickListener { /* no-op, es un tab */ }
-
         binding.btnNotificacion.setOnClickListener {
             Toast.makeText(requireContext(), getString(R.string.notif_coming_soon), Toast.LENGTH_SHORT).show()
         }
@@ -75,37 +73,31 @@ class ProfileFragment : Fragment() {
             val confirmPassword = binding.edtConfirmPassword.text.toString().trim()
 
             if (name.isEmpty()) {
-                Toast.makeText(requireContext(), "\u00bf C\u00f3mo te llamas? Deja tu nombre para guardar", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Deja tu nombre para guardar", Toast.LENGTH_SHORT).show()
                 binding.edtNombre.requestFocus()
                 return@setOnClickListener
             }
 
             if (password.isNotEmpty() && password.length < 6) {
-                Toast.makeText(requireContext(), "Tu contrase\u00f1a nueva debe tener al menos 6 caracteres", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Tu contraseña nueva debe tener al menos 6 caracteres", Toast.LENGTH_SHORT).show()
                 binding.edtPassword.requestFocus()
                 return@setOnClickListener
             }
 
             if (password != confirmPassword) {
-                Toast.makeText(requireContext(), "Las contrase\u00f1as no coinciden. Rev\u00edsalas", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Las contraseñas no coinciden. Revísalas", Toast.LENGTH_SHORT).show()
                 binding.edtConfirmPassword.requestFocus()
                 return@setOnClickListener
             }
 
             lifecycleScope.launch {
-                var success = true
-
-                SupabaseService.updateProfileName(name).onFailure {
-                    success = false
-                }
-
-                if (success) {
+                SupabaseService.updateProfileName(name).onSuccess {
                     binding.txtNombreDisplay.text = name
                     binding.txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
                     binding.edtPassword.text.clear()
                     binding.edtConfirmPassword.text.clear()
-                    Toast.makeText(requireContext(), "\u00a1Listo! Tus cambios se guardaron", Toast.LENGTH_SHORT).show()
-                } else {
+                    Toast.makeText(requireContext(), "¡Listo! Tus cambios se guardaron", Toast.LENGTH_SHORT).show()
+                }.onFailure {
                     Toast.makeText(requireContext(), "No pudimos guardar los cambios. Intenta de nuevo", Toast.LENGTH_LONG).show()
                 }
             }

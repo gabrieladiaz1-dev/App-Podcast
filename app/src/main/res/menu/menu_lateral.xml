@@ -3,19 +3,23 @@
     <item
         android:id="@+id/nav_inicio"
         android:icon="@drawable/ic_home"
-        android:title="@string/drawer_inicio" />
+        android:title="Inicio" />
+    <item
+        android:id="@+id/nav_subir"
+        android:icon="@drawable/ic_upload"
+        android:title="Subir podcast" />
     <item
         android:id="@+id/nav_favoritos"
         android:icon="@drawable/ic_favorite"
-        android:title="@string/drawer_favoritos" />
+        android:title="Favoritos" />
     <item
         android:id="@+id/nav_listas"
         android:icon="@drawable/ic_playlist"
-        android:title="@string/drawer_listas" />
+        android:title="Listas" />
     <item
         android:id="@+id/nav_borradores"
         android:icon="@drawable/ic_draft"
-        android:title="@string/drawer_borradores" />
+        android:title="Borradores" />
     <item
         android:id="@+id/divider"
         android:enabled="false"
@@ -29,5 +33,5 @@
     <item
         android:id="@+id/nav_cerrar_sesion"
         android:icon="@drawable/ic_logout"
-        android:title="@string/drawer_cerrar_sesion" />
+        android:title="Cerrar sesión" />
 </menu>

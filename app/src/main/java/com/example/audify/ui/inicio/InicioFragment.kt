@@ -8,12 +8,15 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.R
-import com.example.audify.data.MockData
+import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentInicioBinding
+import com.example.audify.model.Podcast
 import com.example.audify.ui.adapter.PodcastAdapter
+import kotlinx.coroutines.launch
 
 class InicioFragment : Fragment() {
 
@@ -39,25 +42,34 @@ class InicioFragment : Fragment() {
         binding.btnNotificacion.setOnClickListener {
             Toast.makeText(requireContext(), R.string.notif_coming_soon, Toast.LENGTH_SHORT).show()
         }
-        binding.edtBuscar.setOnEditorActionListener { _, _, _ ->
-            val query = binding.edtBuscar.text.toString().trim()
-            if (query.isNotEmpty()) {
-                Toast.makeText(requireContext(), "Buscando: $query", Toast.LENGTH_SHORT).show()
-            }
-            false
-        }
+
         binding.rvPodcasts.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvPodcasts.adapter = PodcastAdapter(MockData.getPodcasts(), ::openDetail)
         binding.swipeLayout.setOnRefreshListener {
-            binding.rvPodcasts.adapter = PodcastAdapter(MockData.getPodcasts(), ::openDetail)
-            binding.swipeLayout.isRefreshing = false
+            loadPodcasts()
         }
         binding.btnFiltro.setOnClickListener {
             Toast.makeText(requireContext(), R.string.filter_title, Toast.LENGTH_SHORT).show()
         }
+
+        loadPodcasts()
     }
 
-    private fun openDetail(podcast: com.example.audify.model.Podcast) {
+    private fun loadPodcasts() {
+        binding.swipeLayout.isRefreshing = true
+        lifecycleScope.launch {
+            val result = SupabaseService.getAllPodcasts()
+            binding.swipeLayout.isRefreshing = false
+            if (result.isSuccess) {
+                val podcasts = result.getOrNull() ?: emptyList()
+                binding.rvPodcasts.adapter = PodcastAdapter(podcasts, ::openDetail)
+            } else {
+                Toast.makeText(requireContext(), "No pudimos cargar los podcasts", Toast.LENGTH_SHORT).show()
+                binding.rvPodcasts.adapter = PodcastAdapter(emptyList(), ::openDetail)
+            }
+        }
+    }
+
+    private fun openDetail(podcast: Podcast) {
         val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
         Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
     }

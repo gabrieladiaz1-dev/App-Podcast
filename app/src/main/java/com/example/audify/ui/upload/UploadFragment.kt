@@ -636,10 +636,10 @@ class UploadFragment : Fragment() {
             .setTitle("¡Listo!")
             .setIcon(R.drawable.ic_check_circle)
             .setMessage("Tu podcast ya está en revisión. Pronto podrás verlo en tu perfil")
-            .setPositiveButton("Ver mi perfil") { _, _ ->
+            .setPositiveButton("Ver mis podcasts") { _, _ ->
                 resetForm()
                 try {
-                    Navigation.findNavController(requireView()).navigate(R.id.profileFragment)
+                    Navigation.findNavController(requireView()).navigate(R.id.podcastsFragment)
                 } catch (_: Exception) {}
             }
             .setCancelable(false)
