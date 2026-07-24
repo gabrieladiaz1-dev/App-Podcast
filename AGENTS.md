@@ -76,6 +76,9 @@ No real tests exist (only auto-generated stubs). No lint/typecheck configured.
 ## Docs
 Every change must be documented in `docs/` with a date-prefixed filename: `YYYY-MM-DD-descriptive-name.md`.
 
+## AGENTS.md auto‑update
+Before every `git push`, update `AGENTS.md` to reflect the current state of the project (new files, changed architecture, added dependencies, etc.) so the context stays fresh for future agents.
+
 ## Palette (violet/purple)
 - Violet primary: `#532680`, Violet dark: `#3D1A5E`, Violet light: `#E8DDF7`
 - Purple: `#2D0A4A`, Purple light: `#F3E5F5`
