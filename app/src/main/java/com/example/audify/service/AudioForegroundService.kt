@@ -8,11 +8,9 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
-import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -45,6 +43,7 @@ class AudioForegroundService : Service() {
     private var currentTitle = ""
     private var currentUrl = ""
     private var useEarpiece = false
+    private var hasStartedForeground = false
 
     var onPreparedListener: ((Int) -> Unit)? = null
     var onCompletionListener: (() -> Unit)? = null
@@ -84,8 +83,10 @@ class AudioForegroundService : Service() {
                 val url = intent.getStringExtra(EXTRA_URL)
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
                 if (url != null && (currentUrl != url || mediaPlayer == null)) {
+                    currentUrl = url
                     prepareAndPlay(url, title)
                 } else {
+                    if (!hasStartedForeground) startForeground(NOTIFICATION_ID, buildNotification())
                     resume()
                 }
             }
@@ -99,14 +100,16 @@ class AudioForegroundService : Service() {
             else -> {
                 val url = intent?.getStringExtra(EXTRA_URL)
                 val title = intent?.getStringExtra(EXTRA_TITLE) ?: ""
-                if (url != null) prepareAndPlay(url, title)
+                if (url != null) {
+                    currentUrl = url
+                    prepareAndPlay(url, title)
+                }
             }
         }
         return START_NOT_STICKY
     }
 
     fun prepareAndPlay(url: String, title: String) {
-        currentUrl = url
         currentTitle = title
         Log.d(TAG, "prepareAndPlay: $url")
 
@@ -121,6 +124,10 @@ class AudioForegroundService : Service() {
             setDataSource(url)
             setOnPreparedListener { mp ->
                 Log.d(TAG, "MediaPlayer prepared, duration=${mp.duration}")
+
+                startForeground(NOTIFICATION_ID, buildNotification())
+                hasStartedForeground = true
+
                 mp.start()
                 onPreparedListener?.invoke(mp.duration)
                 onPlayStateChanged?.invoke(true)
@@ -144,11 +151,7 @@ class AudioForegroundService : Service() {
 
     fun togglePlayPause() {
         val mp = mediaPlayer ?: return
-        if (mp.isPlaying) {
-            pause()
-        } else {
-            resume()
-        }
+        if (mp.isPlaying) pause() else resume()
     }
 
     fun pause() {
@@ -202,6 +205,7 @@ class AudioForegroundService : Service() {
         mediaPlayer = null
         currentUrl = ""
         currentTitle = ""
+        hasStartedForeground = false
         isServiceRunning = false
         audioManager?.let {
             it.mode = AudioManager.MODE_NORMAL
@@ -229,33 +233,27 @@ class AudioForegroundService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
         val toggleAction = PendingIntent.getService(
             this, 0,
             Intent(this, AudioForegroundService::class.java).apply { action = ACTION_TOGGLE },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
         val rewindAction = PendingIntent.getService(
             this, 1,
             Intent(this, AudioForegroundService::class.java).apply { action = ACTION_SEEK_REWIND },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
         val forwardAction = PendingIntent.getService(
             this, 2,
             Intent(this, AudioForegroundService::class.java).apply { action = ACTION_SEEK_FORWARD },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
         val stopAction = PendingIntent.getService(
             this, 3,
             Intent(this, AudioForegroundService::class.java).apply { action = ACTION_STOP },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
         val playPauseIcon = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
-
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_audify_logo)
             .setContentTitle(currentTitle.ifEmpty { "Audify" })
