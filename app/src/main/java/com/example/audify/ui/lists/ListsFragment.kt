@@ -27,10 +27,16 @@ import kotlinx.coroutines.launch
 
 class ListsFragment : Fragment() {
 
+    companion object {
+        const val ARG_QUEUE_PODCAST_IDS = "queuePodcastIds"
+        const val ARG_QUEUE_INDEX = "queueIndex"
+    }
+
     private var _binding: FragmentListsBinding? = null
     private val binding get() = _binding!!
 
     private var allApprovedPodcasts: List<Podcast> = emptyList()
+    private var activeLoadCount = 0
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -67,52 +73,85 @@ class ListsFragment : Fragment() {
     }
 
     private fun loadPlaylists() {
+        if (_binding == null) return
         if (!SessionManager.isLoggedIn()) {
             binding.txtTotalLists.text = "0"
             binding.rvPlaylists.adapter = PlaylistAdapter(emptyList(), {}, null)
             return
         }
-        lifecycleScope.launch {
-            if (!ensureListsSessionOrRedirect()) {
-                binding.txtTotalLists.text = "0"
-                binding.rvPlaylists.adapter = PlaylistAdapter(emptyList(), {}, null)
-                return@launch
-            }
-            val result = SupabaseService.getUserPlaylists()
-            if (result.isSuccess) {
-                val playlists = result.getOrNull() ?: emptyList()
-                binding.txtTotalLists.text = playlists.size.toString()
-                val modelPlaylists = playlists.map { ps ->
-                    val itemsResult = SupabaseService.getPlaylistItems(ps.id)
-                    val count = itemsResult.getOrNull()?.size ?: 0
-                    Playlist(
-                        id = ps.id.hashCode(),
-                        supabaseId = ps.id,
-                        name = ps.name,
-                        podcastCount = count
-                    )
+        setContentLoading(true)
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                if (!ensureListsSessionOrRedirect()) {
+                    if (_binding != null) {
+                        binding.txtTotalLists.text = "0"
+                        binding.rvPlaylists.adapter = PlaylistAdapter(emptyList(), {}, null)
+                    }
+                    return@launch
                 }
-                binding.rvPlaylists.adapter = PlaylistAdapter(modelPlaylists, ::showPlaylistDetail, ::confirmDeletePlaylist)
-            } else {
-                binding.txtTotalLists.text = "0"
-                val msg = result.exceptionOrNull()?.message ?: "No pudimos cargar tus listas"
-                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                val result = SupabaseService.getUserPlaylists()
+                if (_binding == null) return@launch
+                if (result.isSuccess) {
+                    val playlists = result.getOrNull() ?: emptyList()
+                    binding.txtTotalLists.text = playlists.size.toString()
+                    val modelPlaylists = playlists.map { ps ->
+                        val itemsResult = SupabaseService.getPlaylistItems(ps.id)
+                        val count = itemsResult.getOrNull()?.size ?: 0
+                        Playlist(
+                            id = ps.id.hashCode(),
+                            supabaseId = ps.id,
+                            name = ps.name,
+                            podcastCount = count
+                        )
+                    }
+                    binding.rvPlaylists.adapter = PlaylistAdapter(modelPlaylists, ::showPlaylistDetail, ::confirmDeletePlaylist)
+                } else {
+                    binding.txtTotalLists.text = "0"
+                    val msg = result.exceptionOrNull()?.message ?: "No pudimos cargar tus listas"
+                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                if (_binding != null) {
+                    setContentLoading(false)
+                }
             }
         }
     }
 
     private fun loadAllPodcasts() {
-        lifecycleScope.launch {
-            val result = SupabaseService.getAllPodcasts()
-            if (result.isSuccess) {
-                allApprovedPodcasts = result.getOrNull() ?: emptyList()
-                binding.rvAllPodcasts.adapter = PodcastAdapter(
-                    allApprovedPodcasts,
-                    onItemClick = ::openDetail,
-                    onAuthorClick = ::openAuthorProfile
-                )
+        if (_binding == null) return
+        setContentLoading(true)
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val result = SupabaseService.getAllPodcasts()
+                if (_binding == null) return@launch
+                if (result.isSuccess) {
+                    allApprovedPodcasts = result.getOrNull() ?: emptyList()
+                    binding.rvAllPodcasts.adapter = PodcastAdapter(
+                        allApprovedPodcasts,
+                        onItemClick = ::openDetail,
+                        onAuthorClick = ::openAuthorProfile
+                    )
+                }
+            } finally {
+                if (_binding != null) {
+                    setContentLoading(false)
+                }
             }
         }
+    }
+
+    private fun setContentLoading(loading: Boolean) {
+        if (_binding == null) return
+        if (loading) {
+            activeLoadCount += 1
+        } else {
+            activeLoadCount = (activeLoadCount - 1).coerceAtLeast(0)
+        }
+        val showLoading = activeLoadCount > 0
+        binding.progressBar.visibility = if (showLoading) View.VISIBLE else View.GONE
+        binding.layoutHeader.visibility = if (showLoading) View.INVISIBLE else View.VISIBLE
+        binding.scrollContent.visibility = if (showLoading) View.INVISIBLE else View.VISIBLE
     }
 
     private fun openDetail(podcast: Podcast) {
@@ -178,16 +217,24 @@ class ListsFragment : Fragment() {
     }
 
     private fun showPlaylistDetail(playlist: Playlist) {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val result = SupabaseService.getPlaylistPodcasts(playlist.supabaseId)
             val podcasts = if (result.isSuccess) result.getOrNull() ?: emptyList() else emptyList()
 
             val names = podcasts.joinToString("\n") { "• ${it.title} - ${it.author}" }
             val content = if (names.isEmpty()) "Esta lista está vacía" else names
+            val queueIds = podcasts.map { it.id }.toIntArray()
 
             AlertDialog.Builder(requireContext())
                 .setTitle(playlist.name)
                 .setMessage(content)
+                .setNeutralButton("Reproducir lista") { _, _ ->
+                    if (queueIds.isEmpty()) {
+                        Toast.makeText(requireContext(), "Esta lista está vacía", Toast.LENGTH_SHORT).show()
+                        return@setNeutralButton
+                    }
+                    openPlaylistQueue(queueIds)
+                }
                 .setPositiveButton("Añadir podcast") { _, _ ->
                     if (!SessionManager.isLoggedIn()) {
                         Toast.makeText(requireContext(), "Ingresa para modificar tus listas", Toast.LENGTH_SHORT).show()
@@ -198,6 +245,17 @@ class ListsFragment : Fragment() {
                 .setNegativeButton("Cerrar", null)
                 .show()
         }
+    }
+
+    private fun openPlaylistQueue(queueIds: IntArray) {
+        val root = view ?: return
+        if (queueIds.isEmpty()) return
+        val bundle = Bundle().apply {
+            putInt("podcastId", queueIds[0])
+            putIntArray(ARG_QUEUE_PODCAST_IDS, queueIds)
+            putInt(ARG_QUEUE_INDEX, 0)
+        }
+        Navigation.findNavController(root).navigate(R.id.detailFragment, bundle)
     }
 
     private fun showAddToPlaylistDialog(playlist: Playlist) {
@@ -300,6 +358,7 @@ class ListsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        activeLoadCount = 0
         _binding = null
     }
 }

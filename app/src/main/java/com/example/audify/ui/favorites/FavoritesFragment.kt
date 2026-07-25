@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.LoginActivity
@@ -88,24 +89,35 @@ class FavoritesFragment : Fragment() {
     private fun loadFavorites() {
         if (_binding == null) return
         val userId = SessionManager.getUserId() ?: return
-        binding.progressBar.visibility = View.VISIBLE
+        setContentLoading(true)
         viewLifecycleOwner.lifecycleScope.launch {
-            val result = SupabaseService.getFavoritePodcasts(userId)
-            if (_binding == null) return@launch
-            binding.progressBar.visibility = View.GONE
-            if (result.isSuccess) {
-                allFavorites = result.getOrNull() ?: emptyList()
-                binding.txtFavoriteCount.text = allFavorites.size.toString()
-                binding.txtSectionTitle.text = "Favoritos (${allFavorites.size})"
-                binding.rvFavorites.adapter = PodcastAdapter(
-                    allFavorites,
-                    onItemClick = ::openDetail,
-                    onAuthorClick = ::openAuthorProfile
-                )
-            } else {
-                Toast.makeText(requireContext(), "No pudimos cargar tus favoritos", Toast.LENGTH_SHORT).show()
+            try {
+                val result = SupabaseService.getFavoritePodcasts(userId)
+                if (_binding == null) return@launch
+                if (result.isSuccess) {
+                    allFavorites = result.getOrNull() ?: emptyList()
+                    binding.txtFavoriteCount.text = allFavorites.size.toString()
+                    binding.txtSectionTitle.text = "Favoritos (${allFavorites.size})"
+                    binding.rvFavorites.adapter = PodcastAdapter(
+                        allFavorites,
+                        onItemClick = ::openDetail,
+                        onAuthorClick = ::openAuthorProfile
+                    )
+                } else {
+                    Toast.makeText(requireContext(), "No pudimos cargar tus favoritos", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                if (_binding != null) {
+                    setContentLoading(false)
+                }
             }
         }
+    }
+
+    private fun setContentLoading(loading: Boolean) {
+        if (_binding == null) return
+        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
+        binding.scrollContent.visibility = if (loading) View.INVISIBLE else View.VISIBLE
     }
 
     private fun openDetail(podcast: Podcast) {

@@ -62,41 +62,53 @@ class UserProfileFragment : Fragment() {
     }
 
     private fun loadProfile(userId: String, fallbackName: String? = null) {
-        binding.progressBar.visibility = View.VISIBLE
-        lifecycleScope.launch {
-            val profile = SupabaseService.getProfileByUserId(userId)
-            binding.progressBar.visibility = View.GONE
+        setContentLoading(true)
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val profile = SupabaseService.getProfileByUserId(userId)
+                if (_binding == null) return@launch
 
-            val displayName = profile?.name?.ifEmpty { null }
-                ?: profile?.username?.ifBlank { null }
-                ?: fallbackName?.ifBlank { null }
-                ?: "Usuario"
-            val avatarUrl = profile?.avatar_url
-            if (!avatarUrl.isNullOrBlank()) {
-                binding.imgAvatar.visibility = View.VISIBLE
-                binding.txtAvatar.visibility = View.GONE
-                binding.imgAvatar.load(avatarUrl) {
-                    crossfade(true)
-                    placeholder(R.drawable.bg_circle_violet)
-                    error(R.drawable.bg_circle_violet)
+                val displayName = profile?.name?.ifEmpty { null }
+                    ?: profile?.username?.ifBlank { null }
+                    ?: fallbackName?.ifBlank { null }
+                    ?: "Usuario"
+                val avatarUrl = profile?.avatar_url
+                if (!avatarUrl.isNullOrBlank()) {
+                    binding.imgAvatar.visibility = View.VISIBLE
+                    binding.txtAvatar.visibility = View.GONE
+                    binding.imgAvatar.load(avatarUrl) {
+                        crossfade(true)
+                        placeholder(R.drawable.bg_circle_violet)
+                        error(R.drawable.bg_circle_violet)
+                    }
+                } else {
+                    binding.imgAvatar.visibility = View.GONE
+                    binding.txtAvatar.visibility = View.VISIBLE
+                    binding.txtAvatar.text = displayName.firstOrNull()?.uppercase() ?: "?"
                 }
-            } else {
-                binding.imgAvatar.visibility = View.GONE
-                binding.txtAvatar.visibility = View.VISIBLE
-                binding.txtAvatar.text = displayName.firstOrNull()?.uppercase() ?: "?"
-            }
-            binding.txtNombre.text = displayName
+                binding.txtNombre.text = displayName
 
-            val podcastsResult = SupabaseService.getPodcastsByUser(userId)
-            allPodcasts = if (podcastsResult.isSuccess) podcastsResult.getOrNull() ?: emptyList() else emptyList()
-            selectedCategory = null
-            binding.txtPodcastCount.text = allPodcasts.size.toString()
-            renderCategoryFiltersAndList()
+                val podcastsResult = SupabaseService.getPodcastsByUser(userId)
+                allPodcasts = if (podcastsResult.isSuccess) podcastsResult.getOrNull() ?: emptyList() else emptyList()
+                selectedCategory = null
+                binding.txtPodcastCount.text = allPodcasts.size.toString()
+                renderCategoryFiltersAndList()
 
-            if (profile == null && allPodcasts.isEmpty()) {
-                Toast.makeText(requireContext(), "No encontramos a ese usuario", Toast.LENGTH_SHORT).show()
+                if (profile == null && allPodcasts.isEmpty()) {
+                    Toast.makeText(requireContext(), "No encontramos a ese usuario", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                if (_binding != null) {
+                    setContentLoading(false)
+                }
             }
         }
+    }
+
+    private fun setContentLoading(loading: Boolean) {
+        if (_binding == null) return
+        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
+        binding.scrollContent.visibility = if (loading) View.INVISIBLE else View.VISIBLE
     }
 
     private fun renderCategoryFiltersAndList() {

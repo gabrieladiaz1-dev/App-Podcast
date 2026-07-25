@@ -142,6 +142,7 @@
 
     <!-- Player + Description on white -->
     <ScrollView
+        android:id="@+id/scrollContent"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@android:color/transparent"

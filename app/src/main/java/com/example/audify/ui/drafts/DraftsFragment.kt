@@ -8,12 +8,16 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.R
 import com.example.audify.data.DraftsManager
 import com.example.audify.databinding.FragmentDraftsBinding
 import com.example.audify.ui.adapter.DraftsAdapter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class DraftsFragment : Fragment() {
 
@@ -48,15 +52,35 @@ class DraftsFragment : Fragment() {
     }
 
     private fun loadDrafts() {
-        val drafts = DraftsManager.getAllDrafts()
-        if (drafts.isEmpty()) {
-            binding.rvDrafts.visibility = View.GONE
-            binding.txtEmpty.visibility = View.VISIBLE
-        } else {
-            binding.rvDrafts.visibility = View.VISIBLE
-            binding.txtEmpty.visibility = View.GONE
-            binding.rvDrafts.layoutManager = LinearLayoutManager(requireContext())
-            binding.rvDrafts.adapter = DraftsAdapter(drafts, ::openDraft, ::confirmDeleteDraft)
+        if (_binding == null) return
+        setContentLoading(true)
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val drafts = withContext(Dispatchers.IO) { DraftsManager.getAllDrafts() }
+                if (_binding == null) return@launch
+                if (drafts.isEmpty()) {
+                    binding.rvDrafts.visibility = View.GONE
+                    binding.txtEmpty.visibility = View.VISIBLE
+                } else {
+                    binding.rvDrafts.visibility = View.VISIBLE
+                    binding.txtEmpty.visibility = View.GONE
+                    binding.rvDrafts.layoutManager = LinearLayoutManager(requireContext())
+                    binding.rvDrafts.adapter = DraftsAdapter(drafts, ::openDraft, ::confirmDeleteDraft)
+                }
+            } finally {
+                if (_binding != null) {
+                    setContentLoading(false)
+                }
+            }
+        }
+    }
+
+    private fun setContentLoading(loading: Boolean) {
+        if (_binding == null) return
+        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
+        if (loading) {
+            binding.rvDrafts.visibility = View.INVISIBLE
+            binding.txtEmpty.visibility = View.INVISIBLE
         }
     }
 

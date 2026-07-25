@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.R
@@ -47,7 +48,7 @@ class InicioFragment : Fragment() {
 
         binding.rvPodcasts.layoutManager = LinearLayoutManager(requireContext())
         binding.swipeLayout.setOnRefreshListener {
-            loadPodcasts()
+            loadPodcasts(fromSwipeRefresh = true)
         }
         binding.edtBuscar.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -62,18 +63,25 @@ class InicioFragment : Fragment() {
             showCategoryFilterDialog()
         }
 
-        loadPodcasts()
+        loadPodcasts(fromSwipeRefresh = false)
     }
 
-    private fun loadPodcasts() {
+    private fun loadPodcasts(fromSwipeRefresh: Boolean) {
         if (_binding == null) return
-        binding.progressBar.visibility = View.VISIBLE
-        binding.swipeLayout.isRefreshing = true
+        if (fromSwipeRefresh) {
+            binding.progressBar.visibility = View.GONE
+            binding.swipeLayout.isRefreshing = true
+        } else {
+            binding.swipeLayout.isRefreshing = false
+            setInitialLoading(true)
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             val result = SupabaseService.getAllPodcasts()
             if (_binding == null) return@launch
             binding.swipeLayout.isRefreshing = false
-            binding.progressBar.visibility = View.GONE
+            if (!fromSwipeRefresh) {
+                setInitialLoading(false)
+            }
             if (result.isSuccess) {
                 allPodcasts = result.getOrNull() ?: emptyList()
                 applyFilters()
@@ -83,6 +91,16 @@ class InicioFragment : Fragment() {
                 applyFilters()
             }
         }
+    }
+
+    private fun setInitialLoading(loading: Boolean) {
+        if (_binding == null) return
+        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
+        val contentVisibility = if (loading) View.INVISIBLE else View.VISIBLE
+        binding.edtBuscar.visibility = contentVisibility
+        binding.cardBanner.visibility = contentVisibility
+        binding.layoutDestacadosHeader.visibility = contentVisibility
+        binding.swipeLayout.visibility = contentVisibility
     }
 
     private fun applyFilters() {

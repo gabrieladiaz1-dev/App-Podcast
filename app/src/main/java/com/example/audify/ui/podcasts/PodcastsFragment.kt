@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -31,6 +32,7 @@ class PodcastsFragment : Fragment() {
     private var allPodcasts: List<Podcast> = emptyList()
     private var selectedCategory: String? = null
     private var selectedStatus: StatusFilter = StatusFilter.ALL
+    private var activeLoadCount = 0
 
     private enum class StatusFilter {
         ALL, APPROVED, PENDING
@@ -86,9 +88,8 @@ class PodcastsFragment : Fragment() {
     }
 
     private fun loadProfile() {
+        setContentLoading(true)
         viewLifecycleOwner.lifecycleScope.launch {
-            if (_binding == null) return@launch
-            binding.progressBar.visibility = View.VISIBLE
             try {
                 val profile = SupabaseService.getProfile()
                 if (_binding == null) return@launch
@@ -100,37 +101,52 @@ class PodcastsFragment : Fragment() {
                 binding.txtAvatar.text = "?"
                 binding.txtNombre.text = "Usuario"
             } finally {
-                if (_binding != null) binding.progressBar.visibility = View.GONE
+                if (_binding != null) setContentLoading(false)
             }
         }
     }
 
     private fun loadUserPodcasts() {
         if (_binding == null) return
-        binding.progressBar.visibility = View.VISIBLE
+        setContentLoading(true)
         viewLifecycleOwner.lifecycleScope.launch {
-            val result = SupabaseService.getUserPodcasts()
-            if (_binding == null) return@launch
-            if (result.isSuccess) {
-                allPodcasts = result.getOrNull() ?: emptyList()
-                selectedStatus = StatusFilter.ALL
-                selectedCategory = null
-                val approved = allPodcasts.count { it.approved }
-                val pending = allPodcasts.size - approved
-                binding.txtPodcastCount.text = allPodcasts.size.toString()
-                binding.txtCategoryCount.text = "$approved aprobados · $pending pendiente${if (pending != 1) "s" else ""}"
-                renderCategoryFiltersAndList()
-            } else {
-                allPodcasts = emptyList()
-                selectedStatus = StatusFilter.ALL
-                selectedCategory = null
-                binding.txtPodcastCount.text = "0"
-                binding.txtCategoryCount.text = "0"
-                binding.txtSectionTitle.text = "Mis podcasts (0)"
-                renderCategoryFiltersAndList()
+            try {
+                val result = SupabaseService.getUserPodcasts()
+                if (_binding == null) return@launch
+                if (result.isSuccess) {
+                    allPodcasts = result.getOrNull() ?: emptyList()
+                    selectedStatus = StatusFilter.ALL
+                    selectedCategory = null
+                    val approved = allPodcasts.count { it.approved }
+                    val pending = allPodcasts.size - approved
+                    binding.txtPodcastCount.text = allPodcasts.size.toString()
+                    binding.txtCategoryCount.text = "$approved aprobados · $pending pendiente${if (pending != 1) "s" else ""}"
+                    renderCategoryFiltersAndList()
+                } else {
+                    allPodcasts = emptyList()
+                    selectedStatus = StatusFilter.ALL
+                    selectedCategory = null
+                    binding.txtPodcastCount.text = "0"
+                    binding.txtCategoryCount.text = "0"
+                    binding.txtSectionTitle.text = "Mis podcasts (0)"
+                    renderCategoryFiltersAndList()
+                }
+            } finally {
+                if (_binding != null) setContentLoading(false)
             }
-            binding.progressBar.visibility = View.GONE
         }
+    }
+
+    private fun setContentLoading(loading: Boolean) {
+        if (_binding == null) return
+        if (loading) {
+            activeLoadCount += 1
+        } else {
+            activeLoadCount = (activeLoadCount - 1).coerceAtLeast(0)
+        }
+        val showLoading = activeLoadCount > 0
+        binding.progressBar.visibility = if (showLoading) View.VISIBLE else View.GONE
+        binding.scrollContent.visibility = if (showLoading) View.INVISIBLE else View.VISIBLE
     }
 
     private fun renderCategoryFiltersAndList() {
@@ -244,6 +260,7 @@ class PodcastsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        activeLoadCount = 0
         _binding = null
     }
 }

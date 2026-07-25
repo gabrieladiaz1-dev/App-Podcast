@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.example.audify.LoginActivity
 import com.example.audify.R
 import com.example.audify.SessionManager
@@ -51,6 +52,7 @@ class ProfileFragment : Fragment() {
     private fun loadUserData() {
         if (_binding == null) return
         binding.progressBar.visibility = View.VISIBLE
+        binding.scrollContent.visibility = View.INVISIBLE
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val email = SupabaseService.getCurrentUserEmail() ?: ""
@@ -70,7 +72,10 @@ class ProfileFragment : Fragment() {
                 binding.txtCorreo.text = email
                 binding.edtNombre.setText(fallback)
             } finally {
-                if (_binding != null) binding.progressBar.visibility = View.GONE
+                if (_binding != null) {
+                    binding.progressBar.visibility = View.GONE
+                    binding.scrollContent.visibility = View.VISIBLE
+                }
             }
         }
     }
