@@ -31,9 +31,11 @@ class MainActivity : AppCompatActivity() {
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         val navController = navHostFragment.navController
 
+        disableBottomNavActiveIndicator()
         binding.bottomNavigation.setupWithNavController(navController)
 
         binding.bottomNavigation.setOnItemSelectedListener { item ->
+            animateBottomNavSelection(item.itemId)
             val builder = NavOptions.Builder()
                 .setLaunchSingleTop(true)
             if (item.itemId == R.id.inicioFragment) {
@@ -100,6 +102,31 @@ class MainActivity : AppCompatActivity() {
             }
             binding.drawerLayout.closeDrawer(GravityCompat.START)
             true
+        }
+    }
+
+    private fun animateBottomNavSelection(itemId: Int) {
+        val itemView = binding.bottomNavigation.findViewById<android.view.View>(itemId) ?: return
+        itemView.animate().cancel()
+        itemView.scaleX = 0.94f
+        itemView.scaleY = 0.94f
+        itemView.alpha = 0.92f
+        itemView.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .alpha(1f)
+            .setDuration(180)
+            .setInterpolator(android.view.animation.OvershootInterpolator(1.2f))
+            .start()
+    }
+
+    private fun disableBottomNavActiveIndicator() {
+        try {
+            val method = binding.bottomNavigation.javaClass
+                .getMethod("setItemActiveIndicatorEnabled", Boolean::class.javaPrimitiveType)
+            method.invoke(binding.bottomNavigation, false)
+        } catch (_: Exception) {
+            // Ignore when running with a Material version that does not expose this API.
         }
     }
 

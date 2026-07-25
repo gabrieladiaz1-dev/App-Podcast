@@ -44,6 +44,9 @@ class ListsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        binding.rvPlaylists.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvAllPodcasts.layoutManager = LinearLayoutManager(requireContext())
+
         setupToolbar()
         setupCreateList()
         loadPlaylists()
@@ -70,6 +73,11 @@ class ListsFragment : Fragment() {
             return
         }
         lifecycleScope.launch {
+            if (!ensureListsSessionOrRedirect()) {
+                binding.txtTotalLists.text = "0"
+                binding.rvPlaylists.adapter = PlaylistAdapter(emptyList(), {}, null)
+                return@launch
+            }
             val result = SupabaseService.getUserPlaylists()
             if (result.isSuccess) {
                 val playlists = result.getOrNull() ?: emptyList()
@@ -84,11 +92,11 @@ class ListsFragment : Fragment() {
                         podcastCount = count
                     )
                 }
-                binding.rvPlaylists.layoutManager = LinearLayoutManager(requireContext())
                 binding.rvPlaylists.adapter = PlaylistAdapter(modelPlaylists, ::showPlaylistDetail, ::confirmDeletePlaylist)
             } else {
                 binding.txtTotalLists.text = "0"
-                Toast.makeText(requireContext(), "No pudimos cargar tus listas", Toast.LENGTH_SHORT).show()
+                val msg = result.exceptionOrNull()?.message ?: "No pudimos cargar tus listas"
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -98,7 +106,6 @@ class ListsFragment : Fragment() {
             val result = SupabaseService.getAllPodcasts()
             if (result.isSuccess) {
                 allApprovedPodcasts = result.getOrNull() ?: emptyList()
-                binding.rvAllPodcasts.layoutManager = LinearLayoutManager(requireContext())
                 binding.rvAllPodcasts.adapter = PodcastAdapter(
                     allApprovedPodcasts,
                     onItemClick = ::openDetail,
@@ -158,12 +165,14 @@ class ListsFragment : Fragment() {
 
     private fun createPlaylist(name: String) {
         lifecycleScope.launch {
+            if (!ensureListsSessionOrRedirect()) return@launch
             val result = SupabaseService.createPlaylist(name)
             if (result.isSuccess) {
                 Toast.makeText(requireContext(), "¡Lista \"$name\" creada!", Toast.LENGTH_SHORT).show()
                 loadPlaylists()
             } else {
-                Toast.makeText(requireContext(), "No pudimos crear la lista. Intenta de nuevo", Toast.LENGTH_SHORT).show()
+                val msg = result.exceptionOrNull()?.message ?: "No pudimos crear la lista. Intenta de nuevo"
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -193,6 +202,7 @@ class ListsFragment : Fragment() {
 
     private fun showAddToPlaylistDialog(playlist: Playlist) {
         lifecycleScope.launch {
+            if (!ensureListsSessionOrRedirect()) return@launch
             val itemsResult = SupabaseService.getPlaylistItems(playlist.supabaseId)
             val currentPodcastIds = (itemsResult.getOrNull() ?: emptyList()).map { it.podcast_id }.toMutableSet()
 
@@ -209,10 +219,14 @@ class ListsFragment : Fragment() {
                 .setMultiChoiceItems(podcastNames, checked) { _, which, isChecked ->
                     val podcast = allApprovedPodcasts[which]
                     lifecycleScope.launch {
-                        if (isChecked) {
+                        val result = if (isChecked) {
                             SupabaseService.addPodcastToPlaylist(playlist.supabaseId, podcast.supabaseId)
                         } else {
                             SupabaseService.removePodcastFromPlaylist(playlist.supabaseId, podcast.supabaseId)
+                        }
+                        if (result.isFailure) {
+                            val msg = result.exceptionOrNull()?.message ?: "No pudimos actualizar la lista"
+                            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -242,6 +256,21 @@ class ListsFragment : Fragment() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    private suspend fun ensureListsSessionOrRedirect(): Boolean {
+        val valid = SupabaseService.ensureValidSession()
+        if (valid) return true
+
+        SessionManager.clearSession()
+        Toast.makeText(
+            requireContext(),
+            "Tu sesión expiró. Inicia sesión para usar tus listas",
+            Toast.LENGTH_LONG
+        ).show()
+        startActivity(Intent(requireContext(), LoginActivity::class.java))
+        requireActivity().finish()
+        return false
     }
 
     private fun showFilterDialog() {

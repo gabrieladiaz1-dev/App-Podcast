@@ -6,6 +6,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.example.audify.LoginActivity
@@ -36,6 +38,11 @@ class ProfileFragment : Fragment() {
             startActivity(Intent(requireContext(), LoginActivity::class.java))
             requireActivity().finish()
             return
+        }
+
+        binding.btnBack.setOnClickListener {
+            val drawer = requireActivity().findViewById<DrawerLayout>(R.id.drawerLayout)
+            drawer.openDrawer(GravityCompat.START)
         }
 
         loadUserData()

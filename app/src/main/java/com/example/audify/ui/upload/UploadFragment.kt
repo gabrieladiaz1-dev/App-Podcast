@@ -20,6 +20,8 @@ import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -131,6 +133,10 @@ class UploadFragment : Fragment() {
     }
 
     private fun setupListeners() {
+        binding.btnBack.setOnClickListener {
+            val drawer = requireActivity().findViewById<DrawerLayout>(R.id.drawerLayout)
+            drawer.openDrawer(GravityCompat.START)
+        }
         binding.cardCover.setOnClickListener { pickImage() }
         binding.btnSelectFile.setOnClickListener { pickAudio() }
         binding.btnRecord.setOnClickListener { requestRecordPermission() }

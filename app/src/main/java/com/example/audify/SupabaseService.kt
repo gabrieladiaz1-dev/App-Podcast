@@ -537,6 +537,9 @@ object SupabaseService {
     }
 
     class SessionExpiredException : Exception("Tu sesión expiró, por favor inicia sesión de nuevo")
+    class MissingListsSchemaException : Exception(
+        "Falta configurar tablas de listas en Supabase (playlists/playlist_items)"
+    )
 
     private fun isJwtError(e: Exception): Boolean {
         val msg = e.message?.lowercase() ?: ""
@@ -545,6 +548,13 @@ object SupabaseService {
 
     private fun wrapJwtError(e: Exception): Exception =
         if (isJwtError(e)) SessionExpiredException() else e
+
+    private fun wrapListsError(e: Exception): Exception {
+        val msg = e.message?.lowercase() ?: ""
+        val missingTable = msg.contains("could not find table") || msg.contains("does not exist") || msg.contains("relation")
+        val listsTable = msg.contains("playlists") || msg.contains("playlist_items")
+        return if (missingTable && listsTable) MissingListsSchemaException() else wrapJwtError(e)
+    }
 
     fun getPublicAudioUrl(bucketName: String = "pod", path: String): String {
         return client.storage.from(bucketName).publicUrl(path)
@@ -669,7 +679,7 @@ object SupabaseService {
             Result.success(playlist)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error creando lista: ${e.message}", e)
-            Result.failure(wrapJwtError(e))
+            Result.failure(wrapListsError(e))
         }
     }
 
@@ -684,7 +694,7 @@ object SupabaseService {
             Result.success(result)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error cargando listas: ${e.message}", e)
-            Result.failure(wrapJwtError(e))
+            Result.failure(wrapListsError(e))
         }
     }
 
@@ -700,7 +710,7 @@ object SupabaseService {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error eliminando lista: ${e.message}", e)
-            Result.failure(wrapJwtError(e))
+            Result.failure(wrapListsError(e))
         }
     }
 
@@ -712,7 +722,7 @@ object SupabaseService {
             Result.success(result)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error cargando items de lista: ${e.message}", e)
-            Result.failure(wrapJwtError(e))
+            Result.failure(wrapListsError(e))
         }
     }
 
@@ -734,7 +744,7 @@ object SupabaseService {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error agregando a lista: ${e.message}", e)
-            Result.failure(wrapJwtError(e))
+            Result.failure(wrapListsError(e))
         }
     }
 
@@ -750,7 +760,7 @@ object SupabaseService {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error removiendo de lista: ${e.message}", e)
-            Result.failure(wrapJwtError(e))
+            Result.failure(wrapListsError(e))
         }
     }
 
@@ -779,7 +789,7 @@ object SupabaseService {
             Result.success(podcasts)
         } catch (e: Exception) {
             Log.e("SupabaseService", "Error en getPlaylistPodcasts: ${e.message}", e)
-            Result.failure(wrapJwtError(e))
+            Result.failure(wrapListsError(e))
         }
     }
 }

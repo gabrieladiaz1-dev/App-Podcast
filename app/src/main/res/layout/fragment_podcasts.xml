@@ -159,13 +159,6 @@
                         android:textSize="13sp"
                         android:textStyle="bold"
                         tools:text="6" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/podcasts_categories_label"
-                        android:textColor="#C4B5FD"
-                        android:textSize="10sp" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>

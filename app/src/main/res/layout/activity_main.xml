@@ -31,6 +31,7 @@
             android:background="#FFFFFF"
             app:elevation="8dp"
             app:menu="@menu/bottom_nav_menu"
+            app:itemBackground="@drawable/bg_bottom_nav_item"
             app:itemIconTint="@color/bottom_nav_selector"
             app:itemTextColor="@color/bottom_nav_selector"
             app:itemRippleColor="@android:color/transparent"

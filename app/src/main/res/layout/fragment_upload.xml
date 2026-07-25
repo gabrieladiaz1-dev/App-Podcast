@@ -5,16 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/gradient_bg">
-
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@drawable/bg_curve_content"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+    android:background="@android:color/white">
 
     <!-- Toolbar -->
     <LinearLayout
@@ -34,10 +25,9 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:background="@android:color/transparent"
-            android:contentDescription="@string/back_desc"
+            android:contentDescription="@string/menu_desc"
             android:scaleType="center"
-            android:src="@drawable/ic_arrow_back"
-            android:visibility="gone" />
+            android:src="@drawable/ic_menu_white" />
 
         <TextView
             android:layout_width="0dp"
@@ -51,7 +41,7 @@
 
         <View
             android:layout_width="48dp"
-            android:layout_height="0dp" />
+            android:layout_height="48dp" />
     </LinearLayout>
 
     <!-- Progress overlay -->
@@ -82,7 +72,7 @@
         android:id="@+id/scrollView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@android:color/transparent"
+        android:background="@drawable/gradient_bg"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/toolbar"
@@ -91,6 +81,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@drawable/bg_curve_content"
             android:orientation="vertical"
             android:paddingTop="24dp"
             android:paddingBottom="32dp">
@@ -261,8 +252,9 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="24dp"
-                android:layout_marginTop="8dp"
+                android:layout_marginHorizontal="30dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="10dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
@@ -306,7 +298,7 @@
                     android:id="@+id/btnRecord"
                     android:layout_width="0dp"
                     android:layout_height="80dp"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="14dp"
                     android:layout_weight="1"
                     android:clickable="true"
                     android:focusable="true"

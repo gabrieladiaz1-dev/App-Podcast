@@ -5,6 +5,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -33,7 +35,8 @@ class DraftsFragment : Fragment() {
         DraftsManager.init(requireContext())
 
         binding.btnBack.setOnClickListener {
-            Navigation.findNavController(view).popBackStack()
+            val drawer = requireActivity().findViewById<DrawerLayout>(R.id.drawerLayout)
+            drawer.openDrawer(GravityCompat.START)
         }
 
         loadDrafts()

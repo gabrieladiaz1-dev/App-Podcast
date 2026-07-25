@@ -5,25 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/gradient_bg">
-
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@drawable/bg_header_pattern"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@drawable/bg_curve_content"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+    android:background="@android:color/white">
 
     <LinearLayout
         android:id="@+id/toolbar"
@@ -42,9 +24,9 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:background="@android:color/transparent"
-            android:contentDescription="@string/back_desc"
+            android:contentDescription="@string/menu_desc"
             android:scaleType="center"
-            android:src="@drawable/ic_arrow_back" />
+            android:src="@drawable/ic_menu_white" />
 
         <TextView
             android:layout_width="0dp"
@@ -58,7 +40,7 @@
 
         <View
             android:layout_width="48dp"
-            android:layout_height="0dp" />
+            android:layout_height="48dp" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
