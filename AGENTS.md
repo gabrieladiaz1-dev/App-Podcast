@@ -45,6 +45,8 @@ No real tests exist (only auto-generated stubs). No lint/typecheck configured.
 
 ### Data layer
 - **`SupabaseService.kt`** — singleton, hardcoded Supabase URL + anon key (public). All DB calls use `withContext(Dispatchers.IO)`. Provides: auth, profile CRUD, podcasts query/insert, favorites CRUD, playlists CRUD, categories, file upload/download, signed URLs.
+- **`toEnrichedModel()`** — extension on `PodcastSupabase` that resolves author profile name, category name (with `categoryNameCache`), and cover URL. Used by all podcast list methods.
+- **Favorites:** `addFavorite(userId, podcastId)` uses `mapOf(...)` insert (not data class) to avoid null serialization. Checks for duplicates before insert. Session validation included.
 - **`SessionManager.kt`** — SharedPreferences wrapper for user ID and email.
 - **`DraftsManager.kt`** — JSON-based local storage for upload drafts (SharedPreferences). Used by `UploadFragment` to save/restore draft state.
 - **`MockData.kt`** — hardcoded fallback sample data.
@@ -70,6 +72,8 @@ No real tests exist (only auto-generated stubs). No lint/typecheck configured.
 - Password visibility toggle uses `PasswordTransformationMethod.getInstance()`
 - All drawable backgrounds are custom XML shapes under `res/drawable/bg_*`
 - **Coil** for image loading (cover images, profile avatars)
+- **`PodcastAdapter`** accepts `onItemClick`, `onFavoriteClick`, and `onAuthorClick` lambdas. Author name is clickable (underlined) when `onAuthorClick` is provided.
+- **InicioFragment** supports text search (`edtBuscar`) and category filter dialog (`btnFiltro`), both applied via `applyFilters()`.
 - **SwipeRefreshLayout** on podcast lists (InicioFragment, PodcastsFragment)
 - **SDP/SSP** for responsive sizing (`libs.sdp.android`, `libs.ssp.android`)
 - `network_security_config.xml` allows cleartext for `10.0.2.2` (dev) and Supabase

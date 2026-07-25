@@ -131,7 +131,10 @@ object SupabaseService {
         }
     }
 
-                        podcasts.add(list.first().toEnrichedModel())
+    suspend fun getProfile(): Profile = withContext(Dispatchers.IO) {
+        val user = client.auth.currentUserOrNull() ?: error("Usuario no autenticado")
+        val defaultName = user.email?.substringBefore("@") ?: "Usuario"
+        try {
             val profiles = client.postgrest["profiles"]
                 .select {
                     filter { eq("id", user.id) }
@@ -559,7 +562,10 @@ object SupabaseService {
         } catch (e: Exception) {
             Log.w("SupabaseService", "No se pudo copiar de priv a pod: ${e.message}")
             false
-                        podcasts.add(list.first().toEnrichedModel())
+        }
+    }
+
+    fun extractStoragePath(url: String): Pair<String, String> {
         val marker = "/object/public/"
         val idx = url.indexOf(marker)
         if (idx == -1) {
