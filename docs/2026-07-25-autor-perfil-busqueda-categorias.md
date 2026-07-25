@@ -10,3 +10,7 @@
 ## Validación
 - `:app:assembleDebug` no pudo completarse porque Gradle intentó descargar el toolchain de Java 21 y falló en la resolución del JDK.
 - `get_errors` sobre los archivos tocados no reportó errores de compilación o referencias rotas.
+
+## Corrección posterior
+- Se detectó que `SupabaseService.kt` había quedado corrupto y había perdido varios métodos públicos usados por las pantallas.
+- El archivo se reescribió completo y el build volvió a compilar correctamente usando el JBR de Android Studio en lugar del Java 8 que estaba en `PATH`.

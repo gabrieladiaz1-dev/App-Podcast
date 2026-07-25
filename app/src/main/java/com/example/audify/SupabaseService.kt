@@ -14,7 +14,6 @@ import io.github.jan.supabase.serializer.JacksonSerializer
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
 import io.ktor.client.engine.okhttp.OkHttp
-
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -88,10 +87,7 @@ object SupabaseService {
         return client.auth.currentUserOrNull()?.id
     }
 
-    suspend fun registerUser(
-        email: String,
-        password: String
-    ): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun registerUser(email: String, password: String): Result<String> = withContext(Dispatchers.IO) {
         try {
             client.auth.signUpWith(Email) {
                 this.email = email
@@ -107,9 +103,7 @@ object SupabaseService {
 
     suspend fun createProfile(userId: String, name: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["profiles"].insert(
-                mapOf("id" to userId, "name" to name)
-            )
+            client.postgrest["profiles"].insert(mapOf("id" to userId, "name" to name))
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -131,22 +125,22 @@ object SupabaseService {
         }
     }
 
-                        podcasts.add(list.first().toEnrichedModel())
+    suspend fun getProfile(): Profile = withContext(Dispatchers.IO) {
+        val user = client.auth.currentUserOrNull() ?: error("Usuario no autenticado")
+        val defaultName = user.email?.substringBefore("@") ?: "Usuario"
+        try {
             val profiles = client.postgrest["profiles"]
-                .select {
-                    filter { eq("id", user.id) }
-                }
+                .select { filter { eq("id", user.id) } }
                 .decodeList<Profile>()
             val existing = profiles.firstOrNull()
             if (existing != null && existing.name.isNotEmpty()) return@withContext existing
+
             if (existing != null) {
-                client.postgrest["profiles"].update(
-                    mapOf("name" to defaultName)
-                ) { filter { eq("id", user.id) } }
+                client.postgrest["profiles"].update(mapOf("name" to defaultName)) {
+                    filter { eq("id", user.id) }
+                }
             } else {
-                client.postgrest["profiles"].insert(
-                    mapOf("id" to user.id, "name" to defaultName)
-                )
+                client.postgrest["profiles"].insert(mapOf("id" to user.id, "name" to defaultName))
             }
             Profile(id = user.id, name = defaultName)
         } catch (e: Exception) {
@@ -157,9 +151,7 @@ object SupabaseService {
     suspend fun getProfileByUserId(userId: String): Profile? = withContext(Dispatchers.IO) {
         try {
             val profiles = client.postgrest["profiles"]
-                .select {
-                    filter { eq("id", userId) }
-                }
+                .select { filter { eq("id", userId) } }
                 .decodeList<Profile>()
             profiles.firstOrNull()
         } catch (e: Exception) {
@@ -170,9 +162,7 @@ object SupabaseService {
     suspend fun updateProfileName(name: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val userId = client.auth.currentUserOrNull()?.id ?: error("Usuario no autenticado")
-            client.postgrest["profiles"].update(
-                mapOf("name" to name)
-            ) {
+            client.postgrest["profiles"].update(mapOf("name" to name)) {
                 filter { eq("id", userId) }
             }
             Result.success(Unit)
@@ -190,10 +180,7 @@ object SupabaseService {
         }
     }
 
-    suspend fun loginUser(
-        email: String,
-        password: String
-    ): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun loginUser(email: String, password: String): Result<String> = withContext(Dispatchers.IO) {
         try {
             client.auth.signInWith(Email) {
                 this.email = email
@@ -217,6 +204,11 @@ object SupabaseService {
         @com.fasterxml.jackson.annotation.JsonProperty("cover_url") val cover_url: String? = null,
         @com.fasterxml.jackson.annotation.JsonProperty("approved") val approved: Boolean = false,
         @com.fasterxml.jackson.annotation.JsonProperty("created_at") val created_at: String = ""
+    )
+
+    data class Category(
+        val id: Long = 0,
+        val name: String = ""
     )
 
     private fun PodcastSupabase.toModel(): com.example.audify.model.Podcast {
@@ -268,8 +260,7 @@ object SupabaseService {
             result.forEach { ps ->
                 Log.d("SupabaseService", "  '${ps.title}' approved=${ps.approved} audio_url=${ps.audio_url}")
             }
-            val mapped = result.map { it.toEnrichedModel() }
-            Result.success(mapped)
+            Result.success(result.map { it.toEnrichedModel() })
         } catch (e: Exception) {
             Result.failure(wrapJwtError(e))
         }
@@ -282,8 +273,7 @@ object SupabaseService {
             val result = client.postgrest["podcasts"]
                 .select { filter { eq("user_id", userId) } }
                 .decodeList<PodcastSupabase>()
-            val mapped = result.map { it.toEnrichedModel() }
-            Result.success(mapped)
+            Result.success(result.map { it.toEnrichedModel() })
         } catch (e: Exception) {
             Result.failure(wrapJwtError(e))
         }
@@ -291,9 +281,7 @@ object SupabaseService {
 
     suspend fun getPodcastByIntId(podcastId: Int): com.example.audify.model.Podcast? = withContext(Dispatchers.IO) {
         try {
-            val all = client.postgrest["podcasts"]
-                .select()
-                .decodeList<PodcastSupabase>()
+            val all = client.postgrest["podcasts"].select().decodeList<PodcastSupabase>()
             Log.d("SupabaseService", "getPodcastByIntId: ${all.size} podcasts, looking for hashCode=$podcastId")
             all.forEach { ps ->
                 Log.d("SupabaseService", "  podcast '${ps.title}' id=${ps.id} hashCode=${ps.id.hashCode()} approved=${ps.approved}")
@@ -317,8 +305,7 @@ object SupabaseService {
                     }
                 }
                 .decodeList<PodcastSupabase>()
-            val mapped = result.map { it.toEnrichedModel() }
-            Result.success(mapped)
+            Result.success(result.map { it.toEnrichedModel() })
         } catch (e: Exception) {
             Result.failure(wrapJwtError(e))
         }
@@ -349,10 +336,7 @@ object SupabaseService {
         }
     }
 
-    suspend fun uploadCoverImage(
-        path: String,
-        imageBytes: ByteArray
-    ): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun uploadCoverImage(path: String, imageBytes: ByteArray): Result<String> = withContext(Dispatchers.IO) {
         try {
             val bucket = client.storage.from("portadas")
             try { bucket.delete(path) } catch (_: Exception) {}
@@ -393,9 +377,7 @@ object SupabaseService {
                 Log.d("SupabaseService", "addFavorite: ya existe, no se duplica")
                 return@withContext Result.success(Unit)
             }
-            client.postgrest["favorites"].insert(
-                mapOf("user_id" to userId, "podcast_id" to podcastId)
-            )
+            client.postgrest["favorites"].insert(mapOf("user_id" to userId, "podcast_id" to podcastId))
             Log.d("SupabaseService", "Favorito agregado: user=$userId podcast=$podcastId")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -450,6 +432,7 @@ object SupabaseService {
                 .decodeList<Favorite>()
             Log.d("SupabaseService", "getFavoritePodcasts: user=$userId found ${favs.size} favorites")
             if (favs.isEmpty()) return@withContext Result.success(emptyList())
+
             val podcasts = mutableListOf<com.example.audify.model.Podcast>()
             for (fav in favs) {
                 try {
@@ -464,10 +447,7 @@ object SupabaseService {
                         .decodeList<PodcastSupabase>()
                     Log.d("SupabaseService", "Podcast id=${fav.podcast_id} encontrado: ${list.isNotEmpty()}")
                     if (list.isNotEmpty()) {
-                        val ps = list.first()
-                        val profile = getProfileByUserId(ps.user_id)
-                        val resolvedCover = resolveCoverUrl(ps.cover_url)
-                        podcasts.add(ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover))
+                        podcasts.add(list.first().toEnrichedModel())
                     }
                 } catch (e: Exception) {
                     Log.e("SupabaseService", "Error cargando podcast favorito ${fav.podcast_id}: ${e.message}")
@@ -508,11 +488,6 @@ object SupabaseService {
         }
     }
 
-    data class Category(
-        val id: Long = 0,
-        val name: String = ""
-    )
-
     suspend fun addCategory(name: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             client.postgrest["categories"].insert(mapOf("name" to name))
@@ -547,8 +522,7 @@ object SupabaseService {
     }
 
     suspend fun createSignedUrl(bucketName: String, path: String, expiresInMinutes: Long = 60): String {
-        return client.storage.from(bucketName)
-            .createSignedUrl(path, expiresInMinutes.minutes)
+        return client.storage.from(bucketName).createSignedUrl(path, expiresInMinutes.minutes)
     }
 
     suspend fun moveAudioFromPrivToPod(path: String): Boolean = withContext(Dispatchers.IO) {
@@ -559,7 +533,10 @@ object SupabaseService {
         } catch (e: Exception) {
             Log.w("SupabaseService", "No se pudo copiar de priv a pod: ${e.message}")
             false
-                        podcasts.add(list.first().toEnrichedModel())
+        }
+    }
+
+    fun extractStoragePath(url: String): Pair<String, String> {
         val marker = "/object/public/"
         val idx = url.indexOf(marker)
         if (idx == -1) {
@@ -683,12 +660,8 @@ object SupabaseService {
 
     suspend fun deletePlaylist(playlistId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["playlist_items"].delete {
-                filter { eq("playlist_id", playlistId) }
-            }
-            client.postgrest["playlists"].delete {
-                filter { eq("id", playlistId) }
-            }
+            client.postgrest["playlist_items"].delete { filter { eq("playlist_id", playlistId) } }
+            client.postgrest["playlists"].delete { filter { eq("id", playlistId) } }
             Log.d("SupabaseService", "Lista eliminada: $playlistId")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -721,8 +694,7 @@ object SupabaseService {
                 .decodeList<PlaylistItem>()
             if (existing.isNotEmpty()) return@withContext Result.success(Unit)
 
-            val record = mapOf("playlist_id" to playlistId, "podcast_id" to podcastId)
-            client.postgrest["playlist_items"].insert(record)
+            client.postgrest["playlist_items"].insert(mapOf("playlist_id" to playlistId, "podcast_id" to podcastId))
             Log.d("SupabaseService", "Podcast $podcastId agregado a lista $playlistId")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -751,6 +723,7 @@ object SupabaseService {
         try {
             val items = getPlaylistItems(playlistId).getOrNull() ?: emptyList()
             if (items.isEmpty()) return@withContext Result.success(emptyList())
+
             val podcasts = mutableListOf<com.example.audify.model.Podcast>()
             for (item in items) {
                 try {
