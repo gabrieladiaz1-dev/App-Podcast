@@ -37,6 +37,7 @@ class AudioForegroundService : Service() {
 
         const val EXTRA_URL = "extra_url"
         const val EXTRA_TITLE = "extra_title"
+        const val EXTRA_PODCAST_ID = "extra_podcast_id"
 
         var isServiceRunning = false
             private set
@@ -50,6 +51,7 @@ class AudioForegroundService : Service() {
     private var shakeDetector: ShakeDetector? = null
     private var currentTitle = ""
     private var currentUrl = ""
+    private var currentPodcastId = -1
     private var useEarpiece = false
     private var hasStartedForeground = false
 
@@ -66,6 +68,15 @@ class AudioForegroundService : Service() {
 
     val duration: Int
         get() = mediaPlayer?.duration ?: 0
+
+    val currentPlaybackTitle: String
+        get() = currentTitle
+
+    val hasActivePlaybackSession: Boolean
+        get() = currentUrl.isNotBlank() && mediaPlayer != null
+
+    val currentPlaybackPodcastId: Int
+        get() = currentPodcastId
 
     inner class LocalBinder : Binder() {
         fun getService(): AudioForegroundService = this@AudioForegroundService
@@ -91,6 +102,8 @@ class AudioForegroundService : Service() {
             ACTION_PLAY -> {
                 val url = intent.getStringExtra(EXTRA_URL)
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
+                val podcastId = intent.getIntExtra(EXTRA_PODCAST_ID, -1)
+                if (podcastId > 0) currentPodcastId = podcastId
                 if (url != null && (currentUrl != url || mediaPlayer == null)) {
                     currentUrl = url
                     prepareAndPlay(url, title)
@@ -109,6 +122,8 @@ class AudioForegroundService : Service() {
             else -> {
                 val url = intent?.getStringExtra(EXTRA_URL)
                 val title = intent?.getStringExtra(EXTRA_TITLE) ?: ""
+                val podcastId = intent?.getIntExtra(EXTRA_PODCAST_ID, -1) ?: -1
+                if (podcastId > 0) currentPodcastId = podcastId
                 if (url != null) {
                     currentUrl = url
                     prepareAndPlay(url, title)
@@ -260,6 +275,7 @@ class AudioForegroundService : Service() {
         mediaPlayer = null
         currentUrl = ""
         currentTitle = ""
+        currentPodcastId = -1
         hasStartedForeground = false
         releaseProximityWakeLock()
         proximityWakeLock = null

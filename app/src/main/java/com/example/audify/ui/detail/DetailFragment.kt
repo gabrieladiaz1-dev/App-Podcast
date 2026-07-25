@@ -57,6 +57,12 @@ class DetailFragment : Fragment() {
             Log.d(TAG, "Service connected")
             setupServiceCallbacks()
             updatePlayPauseButton()
+            // If the service was already playing before we bound (e.g. opened from mini player),
+            // onPreparedListener will never fire again — kick the seekbar manually.
+            if (service?.isPlaying == true) {
+                handler.removeCallbacks(updateSeekBar)
+                handler.post(updateSeekBar)
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -247,22 +253,24 @@ class DetailFragment : Fragment() {
         }
 
         binding.btnPlayPause.setOnClickListener { togglePlayPause() }
-        binding.btnRewind.setOnClickListener {
-            if (isQueueMode()) {
-                if (!playPreviousFromQueueIfNeeded()) {
-                    Toast.makeText(requireContext(), "Ya estás en el primer podcast de la lista", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                service?.seekRelative(-10000)
+        binding.btnRewind.setOnClickListener { service?.seekRelative(-10000) }
+        binding.btnForward.setOnClickListener { service?.seekRelative(10000) }
+        binding.btnPrevPodcast.setOnClickListener {
+            if (!isQueueMode()) {
+                Toast.makeText(requireContext(), "Este control funciona al reproducir una lista", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (!playPreviousFromQueueIfNeeded()) {
+                Toast.makeText(requireContext(), "Ya estás en el primer podcast de la lista", Toast.LENGTH_SHORT).show()
             }
         }
-        binding.btnForward.setOnClickListener {
-            if (isQueueMode()) {
-                if (!playNextFromQueueIfNeeded()) {
-                    Toast.makeText(requireContext(), "Fin de la lista", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                service?.seekRelative(10000)
+        binding.btnNextPodcast.setOnClickListener {
+            if (!isQueueMode()) {
+                Toast.makeText(requireContext(), "Este control funciona al reproducir una lista", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (!playNextFromQueueIfNeeded()) {
+                Toast.makeText(requireContext(), "Fin de la lista", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -291,6 +299,9 @@ class DetailFragment : Fragment() {
         val p = podcast ?: return
         val url = p.audioUrl
         if (url.isEmpty()) {
+            if (isQueueMode() && playNextFromQueueIfNeeded()) {
+                return
+            }
             Toast.makeText(requireContext(), "Este podcast no tiene audio disponible", Toast.LENGTH_SHORT).show()
             return
         }
@@ -301,6 +312,9 @@ class DetailFragment : Fragment() {
             Log.d(TAG, "resolveAudioUrl result: $resolvedUrl")
             if (_binding == null || !isAdded) return@launch
             if (resolvedUrl == null) {
+                if (isQueueMode() && playNextFromQueueIfNeeded()) {
+                    return@launch
+                }
                 Toast.makeText(requireContext(), "Este podcast está en revisión y aún no puede escucharse", Toast.LENGTH_LONG).show()
                 binding.btnPlayPause.visibility = View.GONE
                 binding.btnRewind.visibility = View.GONE
@@ -315,6 +329,7 @@ class DetailFragment : Fragment() {
                 action = AudioForegroundService.ACTION_PLAY
                 putExtra(AudioForegroundService.EXTRA_URL, resolvedUrl)
                 putExtra(AudioForegroundService.EXTRA_TITLE, p.title)
+                putExtra(AudioForegroundService.EXTRA_PODCAST_ID, p.id)
             }
             requireContext().startForegroundService(intent)
             requireContext().bindService(intent, serviceConnection, 0)
@@ -387,7 +402,10 @@ class DetailFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         updatePlayPauseButton()
-        if (service?.isPlaying == true) handler.post(updateSeekBar)
+        if (service?.isPlaying == true) {
+            handler.removeCallbacks(updateSeekBar)
+            handler.post(updateSeekBar)
+        }
     }
 
     override fun onPause() {

@@ -20,18 +20,4 @@
         android:id="@+id/nav_borradores"
         android:icon="@drawable/ic_draft"
         android:title="Borradores" />
-    <item
-        android:id="@+id/divider"
-        android:enabled="false"
-        android:title="">
-        <menu>
-            <item
-                android:enabled="false"
-                android:title="" />
-        </menu>
-    </item>
-    <item
-        android:id="@+id/nav_cerrar_sesion"
-        android:icon="@drawable/ic_logout"
-        android:title="Cerrar sesión" />
 </menu>

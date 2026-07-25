@@ -1,7 +1,12 @@
 package com.example.audify
 
+import android.content.ComponentName
 import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
@@ -11,6 +16,7 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.example.audify.databinding.ActivityMainBinding
+import com.example.audify.service.AudioForegroundService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -18,6 +24,33 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     lateinit var binding: ActivityMainBinding
+    private var audioService: AudioForegroundService? = null
+    private var isAudioServiceBound = false
+    private val miniPlayerHandler = Handler(Looper.getMainLooper())
+    private var lastMiniVisible = false
+    private var lastMiniTitle = ""
+    private var lastMiniIsPlaying = false
+    private val miniPlayerUpdater = object : Runnable {
+        override fun run() {
+            refreshMiniPlayer()
+            miniPlayerHandler.postDelayed(this, 900)
+        }
+    }
+
+    private val audioConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as? AudioForegroundService.LocalBinder ?: return
+            audioService = binder.getService()
+            isAudioServiceBound = true
+            refreshMiniPlayer()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            audioService = null
+            isAudioServiceBound = false
+            refreshMiniPlayer()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,19 +128,113 @@ class MainActivity : AppCompatActivity() {
                         navController.navigate(R.id.draftsFragment, null, navOptions)
                     }
                 }
-                R.id.nav_cerrar_sesion -> {
-                    SessionManager.clearSession()
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        SupabaseService.signOut()
-                    }
-                    val intent = Intent(this, LoginActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-                    finish()
-                }
             }
             binding.drawerLayout.closeDrawer(GravityCompat.START)
             true
+        }
+
+        binding.btnDrawerLogout.setOnClickListener {
+            SessionManager.clearSession()
+            lifecycleScope.launch(Dispatchers.IO) {
+                SupabaseService.signOut()
+            }
+            val intent = Intent(this, LoginActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
+
+        setupMiniPlayerControls()
+        refreshMiniPlayer()
+    }
+
+    private fun setupMiniPlayerControls() {
+        binding.btnMiniPlayPause.setOnClickListener {
+            audioService?.togglePlayPause()
+            refreshMiniPlayer()
+        }
+        binding.btnMiniStop.setOnClickListener {
+            val stopIntent = Intent(this, AudioForegroundService::class.java).apply {
+                action = AudioForegroundService.ACTION_STOP
+            }
+            startService(stopIntent)
+            refreshMiniPlayer()
+        }
+        binding.miniPlayerContainer.setOnClickListener {
+            val podcastId = audioService?.currentPlaybackPodcastId ?: -1
+            if (podcastId <= 0) return@setOnClickListener
+            val navHostFragment = supportFragmentManager
+                .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+            val navController = navHostFragment.navController
+            val currentPodcastId = navController.currentBackStackEntry
+                ?.arguments
+                ?.getInt("podcastId", -1) ?: -1
+            if (navController.currentDestination?.id == R.id.detailFragment && currentPodcastId == podcastId) {
+                return@setOnClickListener
+            }
+            val bundle = Bundle().apply { putInt("podcastId", podcastId) }
+            try {
+                navController.navigate(R.id.detailFragment, bundle)
+            } catch (_: Exception) {
+                // Ignore rapid re-entries.
+            }
+        }
+    }
+
+    private fun bindAudioServiceIfRunning() {
+        if (isAudioServiceBound) return
+        val intent = Intent(this, AudioForegroundService::class.java)
+        try {
+            bindService(intent, audioConnection, BIND_AUTO_CREATE)
+        } catch (_: Exception) {
+            // Ignore bind failures when service is not active.
+        }
+    }
+
+    private fun unbindAudioServiceSafely() {
+        if (!isAudioServiceBound) return
+        try {
+            unbindService(audioConnection)
+        } catch (_: Exception) {
+            // Ignore unbind races.
+        }
+        isAudioServiceBound = false
+        audioService = null
+    }
+
+    private fun refreshMiniPlayer() {
+        if (!isAudioServiceBound && AudioForegroundService.isServiceRunning) {
+            bindAudioServiceIfRunning()
+        }
+        val svc = audioService
+        val shouldShow = svc?.hasActivePlaybackSession == true
+        if (!shouldShow) {
+            if (lastMiniVisible) {
+                binding.miniPlayerContainer.visibility = android.view.View.GONE
+                lastMiniVisible = false
+                lastMiniTitle = ""
+            }
+            return
+        }
+
+        val title = svc.currentPlaybackTitle.ifBlank { "Podcast en reproducción" }
+        val isPlaying = svc.isPlaying
+        if (!lastMiniVisible) {
+            binding.miniPlayerContainer.visibility = android.view.View.VISIBLE
+            lastMiniVisible = true
+        }
+        if (title != lastMiniTitle) {
+            binding.txtMiniTitle.text = title
+            lastMiniTitle = title
+        }
+        if (isPlaying != lastMiniIsPlaying) {
+            binding.btnMiniPlayPause.setImageResource(
+                if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+            )
+            binding.txtMiniNowPlaying.text = if (isPlaying) "Reproduciendo" else "Pausado"
+            binding.btnMiniPlayPause.imageTintList = android.content.res.ColorStateList.valueOf(0xFF1E1B4B.toInt())
+            binding.btnMiniStop.imageTintList = android.content.res.ColorStateList.valueOf(0xFF1E1B4B.toInt())
+            lastMiniIsPlaying = isPlaying
         }
     }
 
@@ -175,5 +302,18 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadDrawerUserData()
+        bindAudioServiceIfRunning()
+        miniPlayerHandler.removeCallbacks(miniPlayerUpdater)
+        miniPlayerHandler.post(miniPlayerUpdater)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        miniPlayerHandler.removeCallbacks(miniPlayerUpdater)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unbindAudioServiceSafely()
     }
 }
