@@ -11,6 +11,7 @@ import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.Build
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
@@ -220,16 +221,35 @@ class AudioForegroundService : Service() {
         this.useEarpiece = useEarpiece
         val am = audioManager ?: return
         if (useEarpiece) {
-            am.isSpeakerphoneOn = false
-            am.mode = AudioManager.MODE_IN_COMMUNICATION
+            routeToEarpiece(am)
             acquireProximityWakeLock()
             Log.d(TAG, "Switched to earpiece")
         } else {
-            am.mode = AudioManager.MODE_NORMAL
-            am.isSpeakerphoneOn = true
+            routeToSpeaker(am)
             releaseProximityWakeLock()
             Log.d(TAG, "Switched to speaker")
         }
+    }
+
+    private fun routeToEarpiece(am: AudioManager) {
+        am.mode = AudioManager.MODE_IN_COMMUNICATION
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val outputs = am.availableCommunicationDevices
+            val earpiece = outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE }
+            if (earpiece != null) {
+                val ok = am.setCommunicationDevice(earpiece)
+                Log.d(TAG, "setCommunicationDevice(earpiece)=$ok")
+            }
+        }
+        am.isSpeakerphoneOn = false
+    }
+
+    private fun routeToSpeaker(am: AudioManager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            am.clearCommunicationDevice()
+        }
+        am.mode = AudioManager.MODE_NORMAL
+        am.isSpeakerphoneOn = true
     }
 
     private fun acquireProximityWakeLock() {
@@ -287,8 +307,7 @@ class AudioForegroundService : Service() {
         proximityWakeLock = null
         isServiceRunning = false
         audioManager?.let {
-            it.mode = AudioManager.MODE_NORMAL
-            it.isSpeakerphoneOn = true
+            routeToSpeaker(it)
         }
         Log.d(TAG, "Service stopped")
     }
