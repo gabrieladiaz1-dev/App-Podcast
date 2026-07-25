@@ -9,7 +9,6 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import com.example.audify.LoginActivity
 import com.example.audify.R
 import com.example.audify.SessionManager
@@ -50,10 +49,13 @@ class ProfileFragment : Fragment() {
     }
 
     private fun loadUserData() {
-        lifecycleScope.launch {
+        if (_binding == null) return
+        binding.progressBar.visibility = View.VISIBLE
+        viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val email = SupabaseService.getCurrentUserEmail() ?: ""
                 val profile = SupabaseService.getProfile()
+                if (_binding == null) return@launch
                 val name = profile.name.ifEmpty { email.substringBefore("@").ifEmpty { "Usuario" } }
                 binding.txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
                 binding.txtNombreDisplay.text = name
@@ -61,11 +63,14 @@ class ProfileFragment : Fragment() {
                 binding.edtNombre.setText(name)
             } catch (e: Exception) {
                 val email = SupabaseService.getCurrentUserEmail() ?: ""
+                if (_binding == null) return@launch
                 val fallback = email.substringBefore("@").ifEmpty { "Usuario" }
                 binding.txtAvatar.text = fallback.firstOrNull()?.uppercase() ?: "?"
                 binding.txtNombreDisplay.text = fallback
                 binding.txtCorreo.text = email
                 binding.edtNombre.setText(fallback)
+            } finally {
+                if (_binding != null) binding.progressBar.visibility = View.GONE
             }
         }
     }
@@ -94,8 +99,9 @@ class ProfileFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            lifecycleScope.launch {
+            viewLifecycleOwner.lifecycleScope.launch {
                 SupabaseService.updateProfileName(name).onSuccess {
+                    if (_binding == null) return@onSuccess
                     binding.txtNombreDisplay.text = name
                     binding.txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
                     binding.edtPassword.text.clear()
@@ -109,7 +115,7 @@ class ProfileFragment : Fragment() {
 
         binding.btnCerrarSesion.setOnClickListener {
             SessionManager.clearSession()
-            lifecycleScope.launch {
+            viewLifecycleOwner.lifecycleScope.launch {
                 SupabaseService.signOut()
             }
             val intent = Intent(requireContext(), LoginActivity::class.java)

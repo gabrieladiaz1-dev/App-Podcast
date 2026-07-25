@@ -11,7 +11,6 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.R
@@ -67,10 +66,14 @@ class InicioFragment : Fragment() {
     }
 
     private fun loadPodcasts() {
+        if (_binding == null) return
+        binding.progressBar.visibility = View.VISIBLE
         binding.swipeLayout.isRefreshing = true
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val result = SupabaseService.getAllPodcasts()
+            if (_binding == null) return@launch
             binding.swipeLayout.isRefreshing = false
+            binding.progressBar.visibility = View.GONE
             if (result.isSuccess) {
                 allPodcasts = result.getOrNull() ?: emptyList()
                 applyFilters()
@@ -83,6 +86,7 @@ class InicioFragment : Fragment() {
     }
 
     private fun applyFilters() {
+        if (_binding == null) return
         val filtered = allPodcasts.filter { podcast ->
             val matchesQuery = searchQuery.isBlank() ||
                 podcast.title.contains(searchQuery, ignoreCase = true) ||
@@ -127,17 +131,19 @@ class InicioFragment : Fragment() {
     }
 
     private fun openDetail(podcast: Podcast) {
+        val root = view ?: return
         val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
-        Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
+        Navigation.findNavController(root).navigate(R.id.detailFragment, bundle)
     }
 
     private fun openAuthorProfile(podcast: Podcast) {
         if (podcast.userId.isBlank()) return
+        val root = view ?: return
         val bundle = Bundle().apply {
             putString("userId", podcast.userId)
             putString("authorName", podcast.author)
         }
-        Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
+        Navigation.findNavController(root).navigate(R.id.userProfileFragment, bundle)
     }
 
     override fun onDestroyView() {

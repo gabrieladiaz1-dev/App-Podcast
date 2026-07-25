@@ -9,7 +9,6 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -87,22 +86,31 @@ class PodcastsFragment : Fragment() {
     }
 
     private fun loadProfile() {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (_binding == null) return@launch
+            binding.progressBar.visibility = View.VISIBLE
             try {
                 val profile = SupabaseService.getProfile()
+                if (_binding == null) return@launch
                 val name = profile.name.ifEmpty { "Usuario" }
                 binding.txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
                 binding.txtNombre.text = name
             } catch (e: Exception) {
+                if (_binding == null) return@launch
                 binding.txtAvatar.text = "?"
                 binding.txtNombre.text = "Usuario"
+            } finally {
+                if (_binding != null) binding.progressBar.visibility = View.GONE
             }
         }
     }
 
     private fun loadUserPodcasts() {
-        lifecycleScope.launch {
+        if (_binding == null) return
+        binding.progressBar.visibility = View.VISIBLE
+        viewLifecycleOwner.lifecycleScope.launch {
             val result = SupabaseService.getUserPodcasts()
+            if (_binding == null) return@launch
             if (result.isSuccess) {
                 allPodcasts = result.getOrNull() ?: emptyList()
                 selectedStatus = StatusFilter.ALL
@@ -121,10 +129,12 @@ class PodcastsFragment : Fragment() {
                 binding.txtSectionTitle.text = "Mis podcasts (0)"
                 renderCategoryFiltersAndList()
             }
+            binding.progressBar.visibility = View.GONE
         }
     }
 
     private fun renderCategoryFiltersAndList() {
+        if (_binding == null) return
         val approvedCount = allPodcasts.count { it.approved }
         val pendingCount = allPodcasts.size - approvedCount
 
@@ -217,17 +227,19 @@ class PodcastsFragment : Fragment() {
     }
 
     private fun openDetail(podcast: Podcast) {
+        val root = view ?: return
         val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
-        Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
+        Navigation.findNavController(root).navigate(R.id.detailFragment, bundle)
     }
 
     private fun openAuthorProfile(podcast: Podcast) {
         if (podcast.userId.isBlank()) return
+        val root = view ?: return
         val bundle = Bundle().apply {
             putString("userId", podcast.userId)
             putString("authorName", podcast.author)
         }
-        Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
+        Navigation.findNavController(root).navigate(R.id.userProfileFragment, bundle)
     }
 
     override fun onDestroyView() {

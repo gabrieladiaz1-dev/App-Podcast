@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
@@ -52,6 +53,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         loadDrawerUserData()
+        binding.drawerLayout.addDrawerListener(object : DrawerLayout.SimpleDrawerListener() {
+            override fun onDrawerOpened(drawerView: android.view.View) {
+                loadDrawerUserData()
+            }
+        })
 
         binding.navigationView.setNavigationItemSelectedListener { item ->
             val navOptions = NavOptions.Builder()
@@ -143,9 +149,16 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // Fast local fallback while remote profile/session is restored.
+        val localEmail = SessionManager.getUserEmail().orEmpty()
+        val localName = localEmail.substringBefore("@").ifEmpty { "Usuario" }
+        txtAvatar.text = localName.firstOrNull()?.uppercase() ?: "?"
+        txtNombre.text = localName
+        txtCorreo.text = if (localEmail.isNotBlank()) localEmail else "Cargando..."
+
         lifecycleScope.launch {
             val email = withContext(Dispatchers.IO) {
-                SupabaseService.getCurrentUserEmail() ?: ""
+                SupabaseService.getCurrentUserEmail() ?: localEmail
             }
             val profile = withContext(Dispatchers.IO) {
                 try { SupabaseService.getProfile() } catch (_: Exception) {
@@ -155,7 +168,12 @@ class MainActivity : AppCompatActivity() {
             val name = profile.name.ifEmpty { email.substringBefore("@").ifEmpty { "Usuario" } }
             txtAvatar.text = name.firstOrNull()?.uppercase() ?: "?"
             txtNombre.text = name
-            txtCorreo.text = email
+            txtCorreo.text = if (email.isNotBlank()) email else localEmail
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        loadDrawerUserData()
     }
 }
