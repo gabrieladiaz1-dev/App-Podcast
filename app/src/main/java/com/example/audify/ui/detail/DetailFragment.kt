@@ -68,6 +68,10 @@ class DetailFragment : Fragment() {
         override fun onServiceDisconnected(name: ComponentName?) {
             service = null
             isBound = false
+            handler.removeCallbacks(updateSeekBar)
+            if (_binding != null) {
+                binding.btnPlayPause.setImageResource(R.drawable.ic_play)
+            }
         }
     }
 
@@ -165,6 +169,7 @@ class DetailFragment : Fragment() {
         service?.onErrorListener = { msg ->
             handler.post {
                 if (!isAdded || _binding == null) return@post
+                if (service?.isPlaying == true) return@post
                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
             }
         }
@@ -337,9 +342,12 @@ class DetailFragment : Fragment() {
     }
 
     private fun togglePlayPause() {
-        if (isBound) {
-            service?.togglePlayPause()
+        val svc = service
+        if (!isBound || svc == null || !svc.hasActivePlaybackSession) {
+            bindAudioService()
+            return
         }
+        svc.togglePlayPause()
     }
 
     private fun isQueueMode(): Boolean {

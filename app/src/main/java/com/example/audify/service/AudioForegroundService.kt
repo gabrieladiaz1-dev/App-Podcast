@@ -166,6 +166,11 @@ class AudioForegroundService : Service() {
             }
             setOnErrorListener { _, what, extra ->
                 Log.e(TAG, "MediaPlayer error: what=$what extra=$extra")
+                // Ignore transient invalid-state errors that can happen during rapid source switches.
+                if (extra == -38) {
+                    Log.w(TAG, "Ignoring transient MediaPlayer error extra=-38")
+                    return@setOnErrorListener true
+                }
                 onErrorListener?.invoke("Error de reproducción")
                 onPlayStateChanged?.invoke(false)
                 true
@@ -271,6 +276,7 @@ class AudioForegroundService : Service() {
 
     fun stop() {
         stopSensors()
+        onPlayStateChanged?.invoke(false)
         mediaPlayer?.release()
         mediaPlayer = null
         currentUrl = ""

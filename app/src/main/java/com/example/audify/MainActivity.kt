@@ -1,14 +1,19 @@
 package com.example.audify
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
@@ -22,6 +27,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        private const val REQUEST_NOTIFICATIONS_CODE = 301
+    }
 
     lateinit var binding: ActivityMainBinding
     private var audioService: AudioForegroundService? = null
@@ -133,6 +142,8 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
+        requestNotificationPermissionIfNeeded()
+
         binding.btnDrawerLogout.setOnClickListener {
             SessionManager.clearSession()
             lifecycleScope.launch(Dispatchers.IO) {
@@ -146,6 +157,21 @@ class MainActivity : AppCompatActivity() {
 
         setupMiniPlayerControls()
         refreshMiniPlayer()
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) return
+
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            REQUEST_NOTIFICATIONS_CODE
+        )
     }
 
     private fun setupMiniPlayerControls() {
