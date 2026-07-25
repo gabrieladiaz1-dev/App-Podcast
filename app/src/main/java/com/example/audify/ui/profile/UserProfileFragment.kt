@@ -60,7 +60,11 @@ class UserProfileFragment : Fragment() {
             binding.txtPodcastCount.text = podcasts.size.toString()
             binding.txtSectionTitle.text = "Podcasts (${podcasts.size})"
             binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
-            binding.rvUserPodcasts.adapter = PodcastAdapter(podcasts, ::openDetail)
+            binding.rvUserPodcasts.adapter = PodcastAdapter(
+                podcasts,
+                onItemClick = ::openDetail,
+                onAuthorClick = ::openAuthorProfile
+            )
 
             if (podcasts.isEmpty()) {
                 binding.txtEmpty.visibility = View.VISIBLE
@@ -73,6 +77,12 @@ class UserProfileFragment : Fragment() {
     private fun openDetail(podcast: com.example.audify.model.Podcast) {
         val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
         Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
+    }
+
+    private fun openAuthorProfile(podcast: com.example.audify.model.Podcast) {
+        if (podcast.userId.isBlank()) return
+        val bundle = Bundle().apply { putString("userId", podcast.userId) }
+        Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 
     override fun onDestroyView() {

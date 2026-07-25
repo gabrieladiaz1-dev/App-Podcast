@@ -1,6 +1,9 @@
 package com.example.audify.ui.inicio
 
+import android.app.AlertDialog
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +25,9 @@ class InicioFragment : Fragment() {
 
     private var _binding: FragmentInicioBinding? = null
     private val binding get() = _binding!!
+    private var allPodcasts: List<Podcast> = emptyList()
+    private var searchQuery: String = ""
+    private var selectedCategory: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -47,8 +53,17 @@ class InicioFragment : Fragment() {
         binding.swipeLayout.setOnRefreshListener {
             loadPodcasts()
         }
+        binding.edtBuscar.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            override fun afterTextChanged(s: Editable?) {
+                searchQuery = s?.toString()?.trim().orEmpty()
+                applyFilters()
+            }
+        })
         binding.btnFiltro.setOnClickListener {
-            Toast.makeText(requireContext(), R.string.filter_title, Toast.LENGTH_SHORT).show()
+            showCategoryFilterDialog()
         }
 
         loadPodcasts()
@@ -60,18 +75,69 @@ class InicioFragment : Fragment() {
             val result = SupabaseService.getAllPodcasts()
             binding.swipeLayout.isRefreshing = false
             if (result.isSuccess) {
-                val podcasts = result.getOrNull() ?: emptyList()
-                binding.rvPodcasts.adapter = PodcastAdapter(podcasts, ::openDetail)
+                allPodcasts = result.getOrNull() ?: emptyList()
+                applyFilters()
             } else {
                 Toast.makeText(requireContext(), "No pudimos cargar los podcasts", Toast.LENGTH_SHORT).show()
-                binding.rvPodcasts.adapter = PodcastAdapter(emptyList(), ::openDetail)
+                allPodcasts = emptyList()
+                applyFilters()
             }
         }
+    }
+
+    private fun applyFilters() {
+        val filtered = allPodcasts.filter { podcast ->
+            val matchesQuery = searchQuery.isBlank() ||
+                podcast.title.contains(searchQuery, ignoreCase = true) ||
+                podcast.author.contains(searchQuery, ignoreCase = true) ||
+                podcast.description.contains(searchQuery, ignoreCase = true) ||
+                podcast.category.contains(searchQuery, ignoreCase = true)
+            val matchesCategory = selectedCategory.isNullOrBlank() || podcast.category == selectedCategory
+            matchesQuery && matchesCategory
+        }
+        binding.rvPodcasts.adapter = PodcastAdapter(
+            filtered,
+            onItemClick = ::openDetail,
+            onAuthorClick = ::openAuthorProfile
+        )
+    }
+
+    private fun showCategoryFilterDialog() {
+        val categories = allPodcasts.map { it.category.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+
+        if (categories.isEmpty()) {
+            Toast.makeText(requireContext(), "Aún no hay categorías disponibles", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val options = arrayOf("Todas las categorías", *categories.toTypedArray())
+        val selectedIndex = selectedCategory?.let { category ->
+            categories.indexOf(category).takeIf { it >= 0 }?.plus(1)
+        } ?: 0
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.filter_title)
+            .setSingleChoiceItems(options, selectedIndex) { dialog, which ->
+                selectedCategory = if (which == 0) null else categories[which - 1]
+                applyFilters()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
     }
 
     private fun openDetail(podcast: Podcast) {
         val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
         Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
+    }
+
+    private fun openAuthorProfile(podcast: Podcast) {
+        if (podcast.userId.isBlank()) return
+        val bundle = Bundle().apply { putString("userId", podcast.userId) }
+        Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 
     override fun onDestroyView() {

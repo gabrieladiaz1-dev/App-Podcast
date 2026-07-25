@@ -1,6 +1,7 @@
 package com.example.audify.ui.adapter
 
 import android.content.Intent
+import android.graphics.Paint
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -25,7 +26,8 @@ import kotlinx.coroutines.withContext
 class PodcastAdapter(
     private val items: List<Podcast>,
     private val onItemClick: ((Podcast) -> Unit)? = null,
-    private val onFavoriteClick: ((Podcast) -> Unit)? = null
+    private val onFavoriteClick: ((Podcast) -> Unit)? = null,
+    private val onAuthorClick: ((Podcast) -> Unit)? = null
 ) : RecyclerView.Adapter<PodcastAdapter.ViewHolder>() {
 
     private val favoriteIds = mutableSetOf<String>()
@@ -71,6 +73,20 @@ class PodcastAdapter(
             binding.tvTitle.text = podcast.title
             binding.tvAuthor.text = podcast.author
             binding.tvDescription.text = podcast.description
+
+            val canOpenAuthor = onAuthorClick != null && podcast.userId.isNotBlank()
+            binding.tvAuthor.isClickable = canOpenAuthor
+            binding.tvAuthor.isFocusable = canOpenAuthor
+            binding.tvAuthor.paintFlags = if (canOpenAuthor) {
+                binding.tvAuthor.paintFlags or Paint.UNDERLINE_TEXT_FLAG
+            } else {
+                binding.tvAuthor.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
+            }
+            binding.tvAuthor.setOnClickListener {
+                if (canOpenAuthor) {
+                    onAuthorClick?.invoke(podcast)
+                }
+            }
 
             if (!podcast.coverUrl.isNullOrEmpty()) {
                 binding.ivThumbnail.load(podcast.coverUrl) {

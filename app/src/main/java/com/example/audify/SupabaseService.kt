@@ -28,6 +28,7 @@ object SupabaseService {
     private const val SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hYXl1YnR1cmZqYnRpdWh2eHBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NTA1NjEsImV4cCI6MjEwMDIyNjU2MX0.F15ycjiRUHxddihRr78fMvroxKmdhkJAlBcTz5huxz0"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var categoryNameCache: Map<String, String>? = null
 
     private val client: SupabaseClient by lazy {
         createSupabaseClient(
@@ -130,10 +131,7 @@ object SupabaseService {
         }
     }
 
-    suspend fun getProfile(): Profile = withContext(Dispatchers.IO) {
-        val user = client.auth.currentUserOrNull() ?: error("Usuario no autenticado")
-        val defaultName = user.email?.substringBefore("@") ?: "Usuario"
-        try {
+                        podcasts.add(list.first().toEnrichedModel())
             val profiles = client.postgrest["profiles"]
                 .select {
                     filter { eq("id", user.id) }
@@ -237,6 +235,30 @@ object SupabaseService {
         )
     }
 
+    private suspend fun getCategoryNameMap(): Map<String, String> = withContext(Dispatchers.IO) {
+        categoryNameCache?.let { return@withContext it }
+        try {
+            val categories = client.postgrest["categories"].select().decodeList<Category>()
+            val mapped = categories.associate { it.id.toString() to it.name }
+            categoryNameCache = mapped
+            mapped
+        } catch (e: Exception) {
+            Log.w("SupabaseService", "No se pudieron cargar categorías: ${e.message}")
+            emptyMap()
+        }
+    }
+
+    private suspend fun PodcastSupabase.toEnrichedModel(): com.example.audify.model.Podcast {
+        val profile = getProfileByUserId(this.user_id)
+        val categoryName = getCategoryNameMap()[this.category_id].orEmpty().ifBlank { "General" }
+        val resolvedCover = resolveCoverUrl(this.cover_url)
+        return toModel().copy(
+            author = profile?.name ?: "Desconocido",
+            category = categoryName,
+            coverUrl = resolvedCover
+        )
+    }
+
     suspend fun getAllPodcasts(): Result<List<com.example.audify.model.Podcast>> = withContext(Dispatchers.IO) {
         try {
             val result = client.postgrest["podcasts"]
@@ -246,11 +268,7 @@ object SupabaseService {
             result.forEach { ps ->
                 Log.d("SupabaseService", "  '${ps.title}' approved=${ps.approved} audio_url=${ps.audio_url}")
             }
-            val mapped = result.map { ps ->
-                val profile = getProfileByUserId(ps.user_id)
-                val resolvedCover = resolveCoverUrl(ps.cover_url)
-                ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover)
-            }
+            val mapped = result.map { it.toEnrichedModel() }
             Result.success(mapped)
         } catch (e: Exception) {
             Result.failure(wrapJwtError(e))
@@ -264,11 +282,7 @@ object SupabaseService {
             val result = client.postgrest["podcasts"]
                 .select { filter { eq("user_id", userId) } }
                 .decodeList<PodcastSupabase>()
-            val profile = getProfileByUserId(userId)
-            val mapped = result.map { ps ->
-                val resolvedCover = resolveCoverUrl(ps.cover_url)
-                ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover)
-            }
+            val mapped = result.map { it.toEnrichedModel() }
             Result.success(mapped)
         } catch (e: Exception) {
             Result.failure(wrapJwtError(e))
@@ -286,9 +300,7 @@ object SupabaseService {
             }
             val ps = all.find { it.id.hashCode() == podcastId } ?: return@withContext null
             Log.d("SupabaseService", "Found podcast '${ps.title}' approved=${ps.approved} audio_url=${ps.audio_url}")
-            val profile = getProfileByUserId(ps.user_id)
-            val resolvedCover = resolveCoverUrl(ps.cover_url)
-            ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover)
+            ps.toEnrichedModel()
         } catch (e: Exception) {
             Log.e("SupabaseService", "getPodcastByIntId error: ${e.message}", e)
             null
@@ -305,11 +317,7 @@ object SupabaseService {
                     }
                 }
                 .decodeList<PodcastSupabase>()
-            val profile = getProfileByUserId(userId)
-            val mapped = result.map { ps ->
-                val resolvedCover = resolveCoverUrl(ps.cover_url)
-                ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover)
-            }
+            val mapped = result.map { it.toEnrichedModel() }
             Result.success(mapped)
         } catch (e: Exception) {
             Result.failure(wrapJwtError(e))
@@ -508,6 +516,7 @@ object SupabaseService {
     suspend fun addCategory(name: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             client.postgrest["categories"].insert(mapOf("name" to name))
+            categoryNameCache = null
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -550,10 +559,7 @@ object SupabaseService {
         } catch (e: Exception) {
             Log.w("SupabaseService", "No se pudo copiar de priv a pod: ${e.message}")
             false
-        }
-    }
-
-    fun extractStoragePath(url: String): Pair<String, String> {
+                        podcasts.add(list.first().toEnrichedModel())
         val marker = "/object/public/"
         val idx = url.indexOf(marker)
         if (idx == -1) {
@@ -757,10 +763,7 @@ object SupabaseService {
                         }
                         .decodeList<PodcastSupabase>()
                     if (list.isNotEmpty()) {
-                        val ps = list.first()
-                        val profile = getProfileByUserId(ps.user_id)
-                        val resolvedCover = resolveCoverUrl(ps.cover_url)
-                        podcasts.add(ps.toModel().copy(author = profile?.name ?: "Desconocido", coverUrl = resolvedCover))
+                        podcasts.add(list.first().toEnrichedModel())
                     }
                 } catch (e: Exception) {
                     Log.e("SupabaseService", "Error cargando podcast de lista ${item.podcast_id}: ${e.message}")

@@ -3,6 +3,7 @@ package com.example.audify.ui.detail
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.Paint
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -148,6 +149,19 @@ class DetailFragment : Fragment() {
         binding.txtAuthor.text = p.author
         binding.txtCategory.text = p.category.ifEmpty { "General" }
         binding.txtDescription.text = p.description
+        val canOpenAuthor = p.userId.isNotBlank()
+        binding.txtAuthor.isClickable = canOpenAuthor
+        binding.txtAuthor.isFocusable = canOpenAuthor
+        binding.txtAuthor.paintFlags = if (canOpenAuthor) {
+            binding.txtAuthor.paintFlags or Paint.UNDERLINE_TEXT_FLAG
+        } else {
+            binding.txtAuthor.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
+        }
+        binding.txtAuthor.setOnClickListener {
+            if (canOpenAuthor) {
+                openAuthorProfile(p.userId)
+            }
+        }
 
         if (!p.coverUrl.isNullOrEmpty()) {
             binding.ivCover.load(p.coverUrl) {
@@ -216,6 +230,11 @@ class DetailFragment : Fragment() {
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
+    }
+
+    private fun openAuthorProfile(userId: String) {
+        val bundle = Bundle().apply { putString("userId", userId) }
+        androidx.navigation.Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 
     private fun bindAudioService() {

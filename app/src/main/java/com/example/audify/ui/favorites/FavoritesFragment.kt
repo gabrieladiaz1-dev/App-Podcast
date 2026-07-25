@@ -71,7 +71,11 @@ class FavoritesFragment : Fragment() {
                     it.author.lowercase().contains(query) ||
                     it.description.lowercase().contains(query)
                 }
-                binding.rvFavorites.adapter = PodcastAdapter(filtered, ::openDetail)
+                binding.rvFavorites.adapter = PodcastAdapter(
+                    filtered,
+                    onItemClick = ::openDetail,
+                    onAuthorClick = ::openAuthorProfile
+                )
                 binding.txtSectionTitle.text = "Favoritos (${filtered.size})"
                 binding.txtFavoriteCount.text = filtered.size.toString()
             }
@@ -93,7 +97,11 @@ class FavoritesFragment : Fragment() {
                 allFavorites = result.getOrNull() ?: emptyList()
                 binding.txtFavoriteCount.text = allFavorites.size.toString()
                 binding.txtSectionTitle.text = "Favoritos (${allFavorites.size})"
-                binding.rvFavorites.adapter = PodcastAdapter(allFavorites, ::openDetail)
+                binding.rvFavorites.adapter = PodcastAdapter(
+                    allFavorites,
+                    onItemClick = ::openDetail,
+                    onAuthorClick = ::openAuthorProfile
+                )
             } else {
                 Toast.makeText(requireContext(), "No pudimos cargar tus favoritos", Toast.LENGTH_SHORT).show()
             }
@@ -103,6 +111,12 @@ class FavoritesFragment : Fragment() {
     private fun openDetail(podcast: Podcast) {
         val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
         Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
+    }
+
+    private fun openAuthorProfile(podcast: Podcast) {
+        if (podcast.userId.isBlank()) return
+        val bundle = Bundle().apply { putString("userId", podcast.userId) }
+        Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 
     override fun onDestroyView() {

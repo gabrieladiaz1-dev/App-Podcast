@@ -99,7 +99,11 @@ class ListsFragment : Fragment() {
             if (result.isSuccess) {
                 allApprovedPodcasts = result.getOrNull() ?: emptyList()
                 binding.rvAllPodcasts.layoutManager = LinearLayoutManager(requireContext())
-                binding.rvAllPodcasts.adapter = PodcastAdapter(allApprovedPodcasts, ::openDetail)
+                binding.rvAllPodcasts.adapter = PodcastAdapter(
+                    allApprovedPodcasts,
+                    onItemClick = ::openDetail,
+                    onAuthorClick = ::openAuthorProfile
+                )
             }
         }
     }
@@ -107,6 +111,12 @@ class ListsFragment : Fragment() {
     private fun openDetail(podcast: Podcast) {
         val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
         Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
+    }
+
+    private fun openAuthorProfile(podcast: Podcast) {
+        if (podcast.userId.isBlank()) return
+        val bundle = Bundle().apply { putString("userId", podcast.userId) }
+        Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 
     private fun setupCreateList() {
@@ -239,11 +249,19 @@ class ListsFragment : Fragment() {
             .setItems(categories) { _, which ->
                 val cat = categories[which]
                 val filtered = allApprovedPodcasts.filter { it.category == cat }
-                binding.rvAllPodcasts.adapter = PodcastAdapter(filtered, ::openDetail)
+                binding.rvAllPodcasts.adapter = PodcastAdapter(
+                    filtered,
+                    onItemClick = ::openDetail,
+                    onAuthorClick = ::openAuthorProfile
+                )
                 Toast.makeText(requireContext(), "Mostrando: $cat", Toast.LENGTH_SHORT).show()
             }
             .setPositiveButton("Mostrar todos") { _, _ ->
-                binding.rvAllPodcasts.adapter = PodcastAdapter(allApprovedPodcasts, ::openDetail)
+                binding.rvAllPodcasts.adapter = PodcastAdapter(
+                    allApprovedPodcasts,
+                    onItemClick = ::openDetail,
+                    onAuthorClick = ::openAuthorProfile
+                )
             }
             .show()
     }

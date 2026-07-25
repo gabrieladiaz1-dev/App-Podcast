@@ -81,7 +81,11 @@ class PodcastsFragment : Fragment() {
                 binding.txtCategoryCount.text = "$approved aprobados · $pending pendiente${if (pending != 1) "s" else ""}"
                 binding.txtSectionTitle.text = "Mis podcasts (${podcasts.size})"
                 binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
-                binding.rvUserPodcasts.adapter = PodcastAdapter(podcasts, ::openDetail)
+                binding.rvUserPodcasts.adapter = PodcastAdapter(
+                    podcasts,
+                    onItemClick = ::openDetail,
+                    onAuthorClick = ::openAuthorProfile
+                )
             } else {
                 binding.txtPodcastCount.text = "0"
                 binding.txtCategoryCount.text = "0"
@@ -93,6 +97,12 @@ class PodcastsFragment : Fragment() {
     private fun openDetail(podcast: Podcast) {
         val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
         Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
+    }
+
+    private fun openAuthorProfile(podcast: Podcast) {
+        if (podcast.userId.isBlank()) return
+        val bundle = Bundle().apply { putString("userId", podcast.userId) }
+        Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 
     override fun onDestroyView() {
