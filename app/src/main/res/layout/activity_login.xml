@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/gradient_bg"
-    android:paddingTop="48dp">
+    android:paddingTop="28dp">
 
     <View
         android:id="@+id/headerPattern"
@@ -33,7 +33,7 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="horizontal"
-        app:layout_constraintGuide_percent="0.46" />
+        app:layout_constraintGuide_percent="0.40" />
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/logoCircle"
@@ -121,7 +121,7 @@
         android:textColorHint="#A78BFA"
         android:textSize="15sp"
         app:layout_constraintTop_toBottomOf="@id/headerGuideline"
-        android:layout_marginTop="40dp"
+        android:layout_marginTop="18dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
