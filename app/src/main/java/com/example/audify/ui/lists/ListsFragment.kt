@@ -11,6 +11,9 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -23,6 +26,7 @@ import com.example.audify.model.Playlist
 import com.example.audify.model.Podcast
 import com.example.audify.ui.adapter.PlaylistAdapter
 import com.example.audify.ui.adapter.PodcastAdapter
+import com.example.audify.viewmodel.ListsViewModel
 import kotlinx.coroutines.launch
 
 class ListsFragment : Fragment() {
@@ -34,9 +38,7 @@ class ListsFragment : Fragment() {
 
     private var _binding: FragmentListsBinding? = null
     private val binding get() = _binding!!
-
-    private var allApprovedPodcasts: List<Podcast> = emptyList()
-    private var activeLoadCount = 0
+    private val viewModel: ListsViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -55,13 +57,23 @@ class ListsFragment : Fragment() {
 
         setupToolbar()
         setupCreateList()
-        loadPlaylists()
-        loadAllPodcasts()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.uiState
+                .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+                .collect { state ->
+                    if (_binding == null) return@collect
+                    bindState(state)
+                }
+        }
+
+        viewModel.loadPlaylists()
+        viewModel.loadAllPodcasts()
     }
 
     override fun onResume() {
         super.onResume()
-        loadPlaylists()
+        viewModel.loadPlaylists()
     }
 
     private fun setupToolbar() {
@@ -72,100 +84,29 @@ class ListsFragment : Fragment() {
         binding.btnFilter.setOnClickListener { showFilterDialog() }
     }
 
-    private fun loadPlaylists() {
-        if (_binding == null) return
-        if (!SessionManager.isLoggedIn()) {
-            binding.txtTotalLists.text = "0"
-            binding.rvPlaylists.adapter = PlaylistAdapter(emptyList(), {}, null)
-            return
-        }
-        setContentLoading(true)
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                if (!ensureListsSessionOrRedirect()) {
-                    if (_binding != null) {
-                        binding.txtTotalLists.text = "0"
-                        binding.rvPlaylists.adapter = PlaylistAdapter(emptyList(), {}, null)
-                    }
-                    return@launch
-                }
-                val result = SupabaseService.getUserPlaylists()
-                if (_binding == null) return@launch
-                if (result.isSuccess) {
-                    val playlists = result.getOrNull() ?: emptyList()
-                    binding.txtTotalLists.text = playlists.size.toString()
-                    val modelPlaylists = playlists.map { ps ->
-                        val itemsResult = SupabaseService.getPlaylistItems(ps.id)
-                        val count = itemsResult.getOrNull()?.size ?: 0
-                        Playlist(
-                            id = ps.id.hashCode(),
-                            supabaseId = ps.id,
-                            name = ps.name,
-                            podcastCount = count
-                        )
-                    }
-                    binding.rvPlaylists.adapter = PlaylistAdapter(modelPlaylists, ::showPlaylistDetail, ::confirmDeletePlaylist)
-                } else {
-                    binding.txtTotalLists.text = "0"
-                    val msg = result.exceptionOrNull()?.message ?: "No pudimos cargar tus listas"
-                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-                }
-            } finally {
-                if (_binding != null) {
-                    setContentLoading(false)
-                }
-            }
-        }
-    }
-
-    private fun loadAllPodcasts() {
-        if (_binding == null) return
-        setContentLoading(true)
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val result = SupabaseService.getAllPodcasts()
-                if (_binding == null) return@launch
-                if (result.isSuccess) {
-                    allApprovedPodcasts = result.getOrNull() ?: emptyList()
-                    binding.rvAllPodcasts.adapter = PodcastAdapter(
-                        allApprovedPodcasts,
-                        onItemClick = ::openDetail,
-                        onAuthorClick = ::openAuthorProfile
-                    )
-                }
-            } finally {
-                if (_binding != null) {
-                    setContentLoading(false)
-                }
-            }
-        }
-    }
-
-    private fun setContentLoading(loading: Boolean) {
-        if (_binding == null) return
-        if (loading) {
-            activeLoadCount += 1
+    private fun bindState(state: com.example.audify.viewmodel.ListsUiState) {
+        if (state.isLoading) {
+            binding.progressBar.visibility = View.VISIBLE
+            binding.layoutHeader.visibility = View.INVISIBLE
+            binding.scrollContent.visibility = View.INVISIBLE
         } else {
-            activeLoadCount = (activeLoadCount - 1).coerceAtLeast(0)
+            binding.progressBar.visibility = View.GONE
+            binding.layoutHeader.visibility = View.VISIBLE
+            binding.scrollContent.visibility = View.VISIBLE
         }
-        val showLoading = activeLoadCount > 0
-        binding.progressBar.visibility = if (showLoading) View.VISIBLE else View.GONE
-        binding.layoutHeader.visibility = if (showLoading) View.INVISIBLE else View.VISIBLE
-        binding.scrollContent.visibility = if (showLoading) View.INVISIBLE else View.VISIBLE
-    }
 
-    private fun openDetail(podcast: Podcast) {
-        val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
-        Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
-    }
+        binding.txtTotalLists.text = state.playlists.size.toString()
+        binding.rvPlaylists.adapter = PlaylistAdapter(
+            state.playlists,
+            ::showPlaylistDetail,
+            ::confirmDeletePlaylist
+        )
 
-    private fun openAuthorProfile(podcast: Podcast) {
-        if (podcast.userId.isBlank()) return
-        val bundle = Bundle().apply {
-            putString("userId", podcast.userId)
-            putString("authorName", podcast.author)
-        }
-        Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
+        binding.rvAllPodcasts.adapter = PodcastAdapter(
+            state.allPodcasts,
+            onItemClick = ::openDetail,
+            onAuthorClick = ::openAuthorProfile
+        )
     }
 
     private fun setupCreateList() {
@@ -193,7 +134,11 @@ class ListsFragment : Fragment() {
             .setPositiveButton("Crear") { _, _ ->
                 val name = input.text.toString().trim()
                 if (name.isNotEmpty()) {
-                    createPlaylist(name)
+                    viewModel.createPlaylist(
+                        name,
+                        onSuccess = { Toast.makeText(requireContext(), "¡Lista \"$name\" creada!", Toast.LENGTH_SHORT).show() },
+                        onError = { msg -> Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show() }
+                    )
                 } else {
                     Toast.makeText(requireContext(), "¿Cómo se llama tu lista?", Toast.LENGTH_SHORT).show()
                 }
@@ -202,25 +147,8 @@ class ListsFragment : Fragment() {
             .show()
     }
 
-    private fun createPlaylist(name: String) {
-        lifecycleScope.launch {
-            if (!ensureListsSessionOrRedirect()) return@launch
-            val result = SupabaseService.createPlaylist(name)
-            if (result.isSuccess) {
-                Toast.makeText(requireContext(), "¡Lista \"$name\" creada!", Toast.LENGTH_SHORT).show()
-                loadPlaylists()
-            } else {
-                val msg = result.exceptionOrNull()?.message ?: "No pudimos crear la lista. Intenta de nuevo"
-                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
     private fun showPlaylistDetail(playlist: Playlist) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val result = SupabaseService.getPlaylistPodcasts(playlist.supabaseId)
-            val podcasts = if (result.isSuccess) result.getOrNull() ?: emptyList() else emptyList()
-
+        viewModel.getPlaylistPodcasts(playlist.supabaseId) { podcasts ->
             val names = podcasts.joinToString("\n") { "• ${it.title} - ${it.author}" }
             val content = if (names.isEmpty()) "Esta lista está vacía" else names
             val queueIds = podcasts.map { it.id }.toIntArray()
@@ -259,37 +187,31 @@ class ListsFragment : Fragment() {
     }
 
     private fun showAddToPlaylistDialog(playlist: Playlist) {
+        val allPodcasts = viewModel.uiState.value.allPodcasts
+        if (allPodcasts.isEmpty()) {
+            Toast.makeText(requireContext(), "No hay podcasts disponibles", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         lifecycleScope.launch {
-            if (!ensureListsSessionOrRedirect()) return@launch
             val itemsResult = SupabaseService.getPlaylistItems(playlist.supabaseId)
             val currentPodcastIds = (itemsResult.getOrNull() ?: emptyList()).map { it.podcast_id }.toMutableSet()
 
-            if (allApprovedPodcasts.isEmpty()) {
-                Toast.makeText(requireContext(), "No hay podcasts disponibles", Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-
-            val podcastNames = allApprovedPodcasts.map { "${it.title} - ${it.author}" }.toTypedArray()
-            val checked = allApprovedPodcasts.map { it.supabaseId in currentPodcastIds }.toBooleanArray()
+            val podcastNames = allPodcasts.map { "${it.title} - ${it.author}" }.toTypedArray()
+            val checked = allPodcasts.map { it.supabaseId in currentPodcastIds }.toBooleanArray()
 
             AlertDialog.Builder(requireContext())
                 .setTitle("Añadir a \"${playlist.name}\"")
                 .setMultiChoiceItems(podcastNames, checked) { _, which, isChecked ->
-                    val podcast = allApprovedPodcasts[which]
-                    lifecycleScope.launch {
-                        val result = if (isChecked) {
-                            SupabaseService.addPodcastToPlaylist(playlist.supabaseId, podcast.supabaseId)
-                        } else {
-                            SupabaseService.removePodcastFromPlaylist(playlist.supabaseId, podcast.supabaseId)
-                        }
-                        if (result.isFailure) {
-                            val msg = result.exceptionOrNull()?.message ?: "No pudimos actualizar la lista"
-                            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-                        }
+                    val podcast = allPodcasts[which]
+                    if (isChecked) {
+                        viewModel.addToPlaylist(playlist.supabaseId, podcast.supabaseId) {}
+                    } else {
+                        viewModel.removeFromPlaylist(playlist.supabaseId, podcast.supabaseId) {}
                     }
                 }
                 .setPositiveButton("Listo") { _, _ ->
-                    loadPlaylists()
+                    viewModel.loadPlaylists()
                     Toast.makeText(requireContext(), "¡Lista actualizada!", Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton("Cancelar", null)
@@ -302,12 +224,8 @@ class ListsFragment : Fragment() {
             .setTitle("Eliminar lista")
             .setMessage("¿Eliminar \"${playlist.name}\"? Se eliminarán todos los podcasts guardados en ella.")
             .setPositiveButton("Eliminar") { _, _ ->
-                lifecycleScope.launch {
-                    val result = SupabaseService.deletePlaylist(playlist.supabaseId)
-                    if (result.isSuccess) {
-                        Toast.makeText(requireContext(), "Lista eliminada", Toast.LENGTH_SHORT).show()
-                        loadPlaylists()
-                    } else {
+                viewModel.deletePlaylist(playlist.supabaseId) { success ->
+                    if (!success) {
                         Toast.makeText(requireContext(), "No pudimos eliminar la lista", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -316,29 +234,14 @@ class ListsFragment : Fragment() {
             .show()
     }
 
-    private suspend fun ensureListsSessionOrRedirect(): Boolean {
-        val valid = SupabaseService.ensureValidSession()
-        if (valid) return true
-
-        SessionManager.clearSession()
-        Toast.makeText(
-            requireContext(),
-            "Tu sesión expiró. Inicia sesión para usar tus listas",
-            Toast.LENGTH_LONG
-        ).show()
-        startActivity(Intent(requireContext(), LoginActivity::class.java))
-        requireActivity().finish()
-        return false
-    }
-
     private fun showFilterDialog() {
-        val categories = allApprovedPodcasts.map { it.category }.distinct().toTypedArray()
+        val categories = viewModel.uiState.value.allPodcasts.map { it.category }.distinct().toTypedArray()
         if (categories.isEmpty()) return
         AlertDialog.Builder(requireContext())
             .setTitle("Filtrar por categoría")
             .setItems(categories) { _, which ->
                 val cat = categories[which]
-                val filtered = allApprovedPodcasts.filter { it.category == cat }
+                val filtered = viewModel.uiState.value.allPodcasts.filter { it.category == cat }
                 binding.rvAllPodcasts.adapter = PodcastAdapter(
                     filtered,
                     onItemClick = ::openDetail,
@@ -348,7 +251,7 @@ class ListsFragment : Fragment() {
             }
             .setPositiveButton("Mostrar todos") { _, _ ->
                 binding.rvAllPodcasts.adapter = PodcastAdapter(
-                    allApprovedPodcasts,
+                    viewModel.uiState.value.allPodcasts,
                     onItemClick = ::openDetail,
                     onAuthorClick = ::openAuthorProfile
                 )
@@ -356,9 +259,22 @@ class ListsFragment : Fragment() {
             .show()
     }
 
+    private fun openDetail(podcast: Podcast) {
+        val bundle = Bundle().apply { putInt("podcastId", podcast.id) }
+        Navigation.findNavController(requireView()).navigate(R.id.detailFragment, bundle)
+    }
+
+    private fun openAuthorProfile(podcast: Podcast) {
+        if (podcast.userId.isBlank()) return
+        val bundle = Bundle().apply {
+            putString("userId", podcast.userId)
+            putString("authorName", podcast.author)
+        }
+        Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
-        activeLoadCount = 0
         _binding = null
     }
 }

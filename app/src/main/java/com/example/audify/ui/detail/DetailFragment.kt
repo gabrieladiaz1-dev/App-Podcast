@@ -15,15 +15,18 @@ import android.view.ViewGroup
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import coil.load
 import coil.transform.RoundedCornersTransformation
 import com.example.audify.R
 import com.example.audify.SessionManager
-import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentDetailBinding
 import com.example.audify.model.Podcast
 import com.example.audify.service.AudioForegroundService
+import com.example.audify.viewmodel.DetailViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,8 +43,8 @@ class DetailFragment : Fragment() {
 
     private var _binding: FragmentDetailBinding? = null
     private val binding get() = _binding!!
+    private val viewModel: DetailViewModel by viewModels()
 
-    private var podcast: Podcast? = null
     private var queuePodcastIds: IntArray? = null
     private var queueIndex: Int = -1
     private var service: AudioForegroundService? = null
@@ -57,8 +60,6 @@ class DetailFragment : Fragment() {
             Log.d(TAG, "Service connected")
             setupServiceCallbacks()
             updatePlayPauseButton()
-            // If the service was already playing before we bound (e.g. opened from mini player),
-            // onPreparedListener will never fire again — kick the seekbar manually.
             if (service?.isPlaying == true) {
                 handler.removeCallbacks(updateSeekBar)
                 handler.post(updateSeekBar)
@@ -112,34 +113,114 @@ class DetailFragment : Fragment() {
         }
 
         setupClickListeners()
-        setContentLoading(true)
+
         viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                podcast = SupabaseService.getPodcastByIntId(podcastId)
-                if (_binding == null) return@launch
-
-                if (podcast == null) {
-                    Toast.makeText(requireContext(), "No encontramos ese podcast", Toast.LENGTH_SHORT).show()
-                    requireActivity().onBackPressedDispatcher.onBackPressed()
-                    return@launch
+            viewModel.uiState
+                .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+                .collect { state ->
+                    if (_binding == null) return@collect
+                    bindState(state)
                 }
-
-                bindPodcast()
-                bindAudioService()
-            } finally {
-                if (_binding != null) {
-                    setContentLoading(false)
-                }
-            }
         }
+
+        viewModel.loadPodcast(podcastId)
     }
 
-    private fun setContentLoading(loading: Boolean) {
-        if (_binding == null) return
-        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
-        val contentVisibility = if (loading) View.INVISIBLE else View.VISIBLE
-        binding.layoutCover.visibility = contentVisibility
-        binding.scrollContent.visibility = contentVisibility
+    private fun bindState(state: com.example.audify.viewmodel.DetailUiState) {
+        if (state.isLoading) {
+            binding.progressBar.visibility = View.VISIBLE
+            binding.layoutCover.visibility = View.INVISIBLE
+            binding.scrollContent.visibility = View.INVISIBLE
+            return
+        }
+        binding.progressBar.visibility = View.GONE
+        binding.layoutCover.visibility = View.VISIBLE
+        binding.scrollContent.visibility = View.VISIBLE
+
+        val p = state.podcast ?: return
+
+        binding.txtCoverLetter.text = p.title.firstOrNull()?.uppercase() ?: "?"
+        binding.txtTitle.text = p.title
+        binding.txtAuthor.text = p.author
+        binding.txtCategory.text = p.category.ifEmpty { "General" }
+        binding.txtDescription.text = p.description
+
+        val canOpenAuthor = p.userId.isNotBlank()
+        binding.txtAuthor.isClickable = canOpenAuthor
+        binding.txtAuthor.isFocusable = canOpenAuthor
+        binding.txtAuthor.paintFlags = if (canOpenAuthor) {
+            binding.txtAuthor.paintFlags or Paint.UNDERLINE_TEXT_FLAG
+        } else {
+            binding.txtAuthor.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
+        }
+        binding.txtAuthor.setOnClickListener {
+            if (canOpenAuthor) openAuthorProfile(p.userId)
+        }
+
+        if (!p.coverUrl.isNullOrEmpty()) {
+            binding.ivCover.load(p.coverUrl) {
+                crossfade(true)
+                placeholder(R.drawable.bg_circle_violet)
+                error(R.drawable.bg_circle_violet)
+                transformations(RoundedCornersTransformation(24f))
+            }
+        }
+
+        binding.btnFavorite.setImageResource(
+            if (state.isFavorited) R.drawable.ic_favorite else R.drawable.ic_favorite_border
+        )
+    }
+
+    private fun setupClickListeners() {
+        binding.btnBack.setOnClickListener {
+            requireActivity().onBackPressedDispatcher.onBackPressed()
+        }
+
+        binding.btnFavorite.setOnClickListener {
+            viewModel.toggleFavorite()
+        }
+
+        binding.btnPlayPause.setOnClickListener { togglePlayPause() }
+        binding.btnRewind.setOnClickListener { service?.seekRelative(-10000) }
+        binding.btnForward.setOnClickListener { service?.seekRelative(10000) }
+        binding.btnPrevPodcast.setOnClickListener {
+            if (!isQueueMode()) {
+                Toast.makeText(requireContext(), "Este control funciona al reproducir una lista", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (!playPreviousFromQueueIfNeeded()) {
+                Toast.makeText(requireContext(), "Ya estás en el primer podcast de la lista", Toast.LENGTH_SHORT).show()
+            }
+        }
+        binding.btnNextPodcast.setOnClickListener {
+            if (!isQueueMode()) {
+                Toast.makeText(requireContext(), "Este control funciona al reproducir una lista", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (!playNextFromQueueIfNeeded()) {
+                Toast.makeText(requireContext(), "Fin de la lista", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        binding.seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    service?.seekTo(progress)
+                    binding.txtCurrentTime.text = formatTime(progress)
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+    }
+
+    private fun openAuthorProfile(userId: String) {
+        val root = view ?: return
+        val bundle = Bundle().apply {
+            putString("userId", userId)
+            putString("authorName", viewModel.uiState.value.podcast?.author)
+        }
+        androidx.navigation.Navigation.findNavController(root).navigate(R.id.userProfileFragment, bundle)
     }
 
     private fun setupServiceCallbacks() {
@@ -181,163 +262,45 @@ class DetailFragment : Fragment() {
         binding.btnPlayPause.setImageResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play)
     }
 
-    private fun bindPodcast() {
-        val p = podcast ?: return
-        binding.txtCoverLetter.text = p.title.firstOrNull()?.uppercase() ?: "?"
-        binding.txtTitle.text = p.title
-        binding.txtAuthor.text = p.author
-        binding.txtCategory.text = p.category.ifEmpty { "General" }
-        binding.txtDescription.text = p.description
-        val canOpenAuthor = p.userId.isNotBlank()
-        binding.txtAuthor.isClickable = canOpenAuthor
-        binding.txtAuthor.isFocusable = canOpenAuthor
-        binding.txtAuthor.paintFlags = if (canOpenAuthor) {
-            binding.txtAuthor.paintFlags or Paint.UNDERLINE_TEXT_FLAG
-        } else {
-            binding.txtAuthor.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
-        }
-        binding.txtAuthor.setOnClickListener {
-            if (canOpenAuthor) {
-                openAuthorProfile(p.userId)
-            }
-        }
-
-        if (!p.coverUrl.isNullOrEmpty()) {
-            binding.ivCover.load(p.coverUrl) {
-                crossfade(true)
-                placeholder(R.drawable.bg_circle_violet)
-                error(R.drawable.bg_circle_violet)
-                transformations(RoundedCornersTransformation(24f))
-            }
-        }
-
-        val userId = SessionManager.getUserId()
-        if (userId != null) {
-            viewLifecycleOwner.lifecycleScope.launch {
-                val isFav = SupabaseService.isFavorited(userId, p.supabaseId)
-                if (_binding == null) return@launch
-                binding.btnFavorite.setImageResource(
-                    if (isFav) R.drawable.ic_favorite else R.drawable.ic_favorite_border
-                )
-            }
-        }
-    }
-
-    private fun setupClickListeners() {
-        binding.btnBack.setOnClickListener {
-            requireActivity().onBackPressedDispatcher.onBackPressed()
-        }
-
-        binding.btnFavorite.setOnClickListener {
-            val p = podcast ?: return@setOnClickListener
-            val userId = SessionManager.getUserId() ?: run {
-                Toast.makeText(requireContext(), "Ingresa para guardar favoritos", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val podcastIdStr = p.supabaseId
-            binding.btnFavorite.isEnabled = false
-            viewLifecycleOwner.lifecycleScope.launch {
-                val isFav = SupabaseService.isFavorited(userId, podcastIdStr)
-                val result = if (isFav) {
-                    SupabaseService.removeFavorite(userId, podcastIdStr)
-                } else {
-                    SupabaseService.addFavorite(userId, podcastIdStr)
-                }
-                if (_binding == null) return@launch
-                binding.btnFavorite.isEnabled = true
-                if (result.isSuccess) {
-                    if (isFav) {
-                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
-                    } else {
-                        binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
-                    }
-                } else {
-                    Toast.makeText(requireContext(), "No pudimos actualizar el favorito. Intenta de nuevo", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-
-        binding.btnPlayPause.setOnClickListener { togglePlayPause() }
-        binding.btnRewind.setOnClickListener { service?.seekRelative(-10000) }
-        binding.btnForward.setOnClickListener { service?.seekRelative(10000) }
-        binding.btnPrevPodcast.setOnClickListener {
-            if (!isQueueMode()) {
-                Toast.makeText(requireContext(), "Este control funciona al reproducir una lista", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (!playPreviousFromQueueIfNeeded()) {
-                Toast.makeText(requireContext(), "Ya estás en el primer podcast de la lista", Toast.LENGTH_SHORT).show()
-            }
-        }
-        binding.btnNextPodcast.setOnClickListener {
-            if (!isQueueMode()) {
-                Toast.makeText(requireContext(), "Este control funciona al reproducir una lista", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (!playNextFromQueueIfNeeded()) {
-                Toast.makeText(requireContext(), "Fin de la lista", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        binding.seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    service?.seekTo(progress)
-                    binding.txtCurrentTime.text = formatTime(progress)
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-    }
-
-    private fun openAuthorProfile(userId: String) {
-        val root = view ?: return
-        val bundle = Bundle().apply {
-            putString("userId", userId)
-            putString("authorName", podcast?.author)
-        }
-        androidx.navigation.Navigation.findNavController(root).navigate(R.id.userProfileFragment, bundle)
-    }
-
     private fun bindAudioService() {
-        val p = podcast ?: return
+        val p = viewModel.uiState.value.podcast ?: return
         val url = p.audioUrl
         if (url.isEmpty()) {
-            if (isQueueMode() && playNextFromQueueIfNeeded()) {
-                return
-            }
+            if (isQueueMode() && playNextFromQueueIfNeeded()) return
             Toast.makeText(requireContext(), "Este podcast no tiene audio disponible", Toast.LENGTH_SHORT).show()
             return
         }
 
         Log.d(TAG, "bindAudioService: audioUrl=$url approved=${p.approved}")
+        viewModel.resolveAudio()
         viewLifecycleOwner.lifecycleScope.launch {
-            val resolvedUrl = SupabaseService.resolveAudioUrl(url, p.approved)
-            Log.d(TAG, "resolveAudioUrl result: $resolvedUrl")
-            if (_binding == null || !isAdded) return@launch
-            if (resolvedUrl == null) {
-                if (isQueueMode() && playNextFromQueueIfNeeded()) {
-                    return@launch
-                }
-                Toast.makeText(requireContext(), "Este podcast está en revisión y aún no puede escucharse", Toast.LENGTH_LONG).show()
-                binding.btnPlayPause.visibility = View.GONE
-                binding.btnRewind.visibility = View.GONE
-                binding.btnForward.visibility = View.GONE
-                binding.seekBar.visibility = View.GONE
-                binding.txtCurrentTime.visibility = View.GONE
-                binding.txtTotalTime.visibility = View.GONE
-                return@launch
-            }
+            viewModel.uiState
+                .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+                .collect { state ->
+                    if (_binding == null || !isAdded) return@collect
+                    if (!state.audioResolved) return@collect
+                    val resolvedUrl = state.resolvedAudioUrl
+                    if (resolvedUrl == null) {
+                        if (isQueueMode() && playNextFromQueueIfNeeded()) return@collect
+                        Toast.makeText(requireContext(), "Este podcast está en revisión y aún no puede escucharse", Toast.LENGTH_LONG).show()
+                        binding.btnPlayPause.visibility = View.GONE
+                        binding.btnRewind.visibility = View.GONE
+                        binding.btnForward.visibility = View.GONE
+                        binding.seekBar.visibility = View.GONE
+                        binding.txtCurrentTime.visibility = View.GONE
+                        binding.txtTotalTime.visibility = View.GONE
+                        return@collect
+                    }
 
-            val intent = Intent(requireContext(), AudioForegroundService::class.java).apply {
-                action = AudioForegroundService.ACTION_PLAY
-                putExtra(AudioForegroundService.EXTRA_URL, resolvedUrl)
-                putExtra(AudioForegroundService.EXTRA_TITLE, p.title)
-                putExtra(AudioForegroundService.EXTRA_PODCAST_ID, p.id)
-            }
-            requireContext().startForegroundService(intent)
-            requireContext().bindService(intent, serviceConnection, 0)
+                    val intent = Intent(requireContext(), AudioForegroundService::class.java).apply {
+                        action = AudioForegroundService.ACTION_PLAY
+                        putExtra(AudioForegroundService.EXTRA_URL, resolvedUrl)
+                        putExtra(AudioForegroundService.EXTRA_TITLE, p.title)
+                        putExtra(AudioForegroundService.EXTRA_PODCAST_ID, p.id)
+                    }
+                    requireContext().startForegroundService(intent)
+                    requireContext().bindService(intent, serviceConnection, 0)
+                }
         }
     }
 
@@ -358,11 +321,8 @@ class DetailFragment : Fragment() {
     private fun playPreviousFromQueueIfNeeded(): Boolean {
         val ids = queuePodcastIds ?: return false
         if (ids.size <= 1 || queueIndex <= 0) return false
-
-        val previousIndex = queueIndex - 1
-        queueIndex = previousIndex
-        val previousPodcastId = ids[previousIndex]
-        loadPodcastFromQueue(previousPodcastId)
+        queueIndex -= 1
+        loadPodcastFromQueue(ids[queueIndex])
         return true
     }
 
@@ -370,34 +330,26 @@ class DetailFragment : Fragment() {
         val ids = queuePodcastIds ?: return false
         if (ids.size <= 1 || queueIndex < 0) return false
         val nextIndex = queueIndex + 1
-        if (nextIndex >= ids.size) {
-            return false
-        }
-
+        if (nextIndex >= ids.size) return false
         queueIndex = nextIndex
-        val nextPodcastId = ids[nextIndex]
-        loadPodcastFromQueue(nextPodcastId)
+        loadPodcastFromQueue(ids[nextIndex])
         return true
     }
 
     private fun loadPodcastFromQueue(podcastId: Int) {
-        setContentLoading(true)
+        viewModel.loadPodcast(podcastId)
         viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val nextPodcast = SupabaseService.getPodcastByIntId(podcastId)
-                if (_binding == null || !isAdded) return@launch
-                if (nextPodcast == null) {
-                    Toast.makeText(requireContext(), "No pudimos cargar el siguiente podcast", Toast.LENGTH_SHORT).show()
-                    return@launch
+            viewModel.uiState
+                .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+                .collect { state ->
+                    if (_binding == null || !isAdded) return@collect
+                    if (state.isLoading) return@collect
+                    if (state.podcast == null) {
+                        Toast.makeText(requireContext(), "No pudimos cargar el siguiente podcast", Toast.LENGTH_SHORT).show()
+                        return@collect
+                    }
+                    bindAudioService()
                 }
-                podcast = nextPodcast
-                bindPodcast()
-                bindAudioService()
-            } finally {
-                if (_binding != null) {
-                    setContentLoading(false)
-                }
-            }
         }
     }
 
@@ -431,9 +383,7 @@ class DetailFragment : Fragment() {
         if (isBound) {
             try {
                 requireContext().unbindService(serviceConnection)
-            } catch (_: Exception) {
-                // Service may already be unbound when user navigates very fast.
-            }
+            } catch (_: Exception) {}
             isBound = false
         }
         service = null

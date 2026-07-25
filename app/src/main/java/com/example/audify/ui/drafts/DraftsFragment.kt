@@ -8,6 +8,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -15,14 +18,14 @@ import com.example.audify.R
 import com.example.audify.data.DraftsManager
 import com.example.audify.databinding.FragmentDraftsBinding
 import com.example.audify.ui.adapter.DraftsAdapter
-import kotlinx.coroutines.Dispatchers
+import com.example.audify.viewmodel.DraftsViewModel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class DraftsFragment : Fragment() {
 
     private var _binding: FragmentDraftsBinding? = null
     private val binding get() = _binding!!
+    private val viewModel: DraftsViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -36,51 +39,49 @@ class DraftsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        DraftsManager.init(requireContext())
-
         binding.btnBack.setOnClickListener {
             val drawer = requireActivity().findViewById<DrawerLayout>(R.id.drawerLayout)
             drawer.openDrawer(GravityCompat.START)
         }
 
-        loadDrafts()
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.uiState
+                .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+                .collect { state ->
+                    if (_binding == null) return@collect
+                    bindState(state)
+                }
+        }
+
+        viewModel.loadDrafts(requireContext())
     }
 
     override fun onResume() {
         super.onResume()
-        loadDrafts()
+        viewModel.loadDrafts(requireContext())
     }
 
-    private fun loadDrafts() {
-        if (_binding == null) return
-        setContentLoading(true)
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val drafts = withContext(Dispatchers.IO) { DraftsManager.getAllDrafts() }
-                if (_binding == null) return@launch
-                if (drafts.isEmpty()) {
-                    binding.rvDrafts.visibility = View.GONE
-                    binding.txtEmpty.visibility = View.VISIBLE
-                } else {
-                    binding.rvDrafts.visibility = View.VISIBLE
-                    binding.txtEmpty.visibility = View.GONE
-                    binding.rvDrafts.layoutManager = LinearLayoutManager(requireContext())
-                    binding.rvDrafts.adapter = DraftsAdapter(drafts, ::openDraft, ::confirmDeleteDraft)
-                }
-            } finally {
-                if (_binding != null) {
-                    setContentLoading(false)
-                }
-            }
-        }
-    }
-
-    private fun setContentLoading(loading: Boolean) {
-        if (_binding == null) return
-        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
-        if (loading) {
+    private fun bindState(state: com.example.audify.viewmodel.DraftsUiState) {
+        if (state.isLoading) {
+            binding.progressBar.visibility = View.VISIBLE
             binding.rvDrafts.visibility = View.INVISIBLE
             binding.txtEmpty.visibility = View.INVISIBLE
+            return
+        }
+        binding.progressBar.visibility = View.GONE
+
+        if (state.drafts.isEmpty()) {
+            binding.rvDrafts.visibility = View.GONE
+            binding.txtEmpty.visibility = View.VISIBLE
+        } else {
+            binding.rvDrafts.visibility = View.VISIBLE
+            binding.txtEmpty.visibility = View.GONE
+            binding.rvDrafts.layoutManager = LinearLayoutManager(requireContext())
+            binding.rvDrafts.adapter = DraftsAdapter(
+                state.drafts,
+                ::openDraft,
+                ::confirmDeleteDraft
+            )
         }
     }
 
@@ -94,8 +95,7 @@ class DraftsFragment : Fragment() {
             .setTitle("Eliminar borrador")
             .setMessage("¿Eliminar \"${draft.title.ifEmpty { "Sin título" }}\"?")
             .setPositiveButton("Eliminar") { _, _ ->
-                DraftsManager.deleteDraft(requireContext(), draft.id)
-                loadDrafts()
+                viewModel.deleteDraft(requireContext(), draft.id)
             }
             .setNegativeButton("Cancelar", null)
             .show()

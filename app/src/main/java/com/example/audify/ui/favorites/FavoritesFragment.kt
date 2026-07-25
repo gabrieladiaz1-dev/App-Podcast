@@ -7,27 +7,29 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.LoginActivity
 import com.example.audify.R
 import com.example.audify.SessionManager
-import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentFavoritesBinding
 import com.example.audify.model.Podcast
 import com.example.audify.ui.adapter.PodcastAdapter
+import com.example.audify.viewmodel.FavoritesViewModel
 import kotlinx.coroutines.launch
 
 class FavoritesFragment : Fragment() {
 
     private var _binding: FragmentFavoritesBinding? = null
     private val binding get() = _binding!!
-    private var allFavorites: List<Podcast> = emptyList()
+    private val viewModel: FavoritesViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -52,72 +54,50 @@ class FavoritesFragment : Fragment() {
             val drawer = requireActivity().findViewById<DrawerLayout>(R.id.drawerLayout)
             drawer.openDrawer(GravityCompat.START)
         }
-        setupSearch()
-        loadFavorites()
-    }
 
-    private fun setupSearch() {
         binding.edtSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
-                val query = s?.toString()?.trim()?.lowercase() ?: ""
-                val filtered = if (query.isEmpty()) allFavorites
-                else allFavorites.filter {
-                    it.title.lowercase().contains(query) ||
-                    it.author.lowercase().contains(query) ||
-                    it.description.lowercase().contains(query)
-                }
-                binding.rvFavorites.adapter = PodcastAdapter(
-                    filtered,
-                    onItemClick = ::openDetail,
-                    onAuthorClick = ::openAuthorProfile
-                )
-                binding.txtSectionTitle.text = "Favoritos (${filtered.size})"
-                binding.txtFavoriteCount.text = filtered.size.toString()
+                viewModel.setSearchQuery(s?.toString()?.trim() ?: "")
             }
         })
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.uiState
+                .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+                .collect { state ->
+                    if (_binding == null) return@collect
+                    bindState(state)
+                }
+        }
+
+        viewModel.loadFavorites()
     }
 
     override fun onResume() {
         super.onResume()
         if (SessionManager.isLoggedIn()) {
-            loadFavorites()
+            viewModel.loadFavorites()
         }
     }
 
-    private fun loadFavorites() {
-        if (_binding == null) return
-        val userId = SessionManager.getUserId() ?: return
-        setContentLoading(true)
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val result = SupabaseService.getFavoritePodcasts(userId)
-                if (_binding == null) return@launch
-                if (result.isSuccess) {
-                    allFavorites = result.getOrNull() ?: emptyList()
-                    binding.txtFavoriteCount.text = allFavorites.size.toString()
-                    binding.txtSectionTitle.text = "Favoritos (${allFavorites.size})"
-                    binding.rvFavorites.adapter = PodcastAdapter(
-                        allFavorites,
-                        onItemClick = ::openDetail,
-                        onAuthorClick = ::openAuthorProfile
-                    )
-                } else {
-                    Toast.makeText(requireContext(), "No pudimos cargar tus favoritos", Toast.LENGTH_SHORT).show()
-                }
-            } finally {
-                if (_binding != null) {
-                    setContentLoading(false)
-                }
-            }
+    private fun bindState(state: com.example.audify.viewmodel.FavoritesUiState) {
+        if (state.isLoading) {
+            binding.progressBar.visibility = View.VISIBLE
+            binding.scrollContent.visibility = View.INVISIBLE
+            return
         }
-    }
+        binding.progressBar.visibility = View.GONE
+        binding.scrollContent.visibility = View.VISIBLE
 
-    private fun setContentLoading(loading: Boolean) {
-        if (_binding == null) return
-        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
-        binding.scrollContent.visibility = if (loading) View.INVISIBLE else View.VISIBLE
+        binding.txtFavoriteCount.text = state.filteredFavorites.size.toString()
+        binding.txtSectionTitle.text = "Favoritos (${state.filteredFavorites.size})"
+        binding.rvFavorites.adapter = PodcastAdapter(
+            state.filteredFavorites,
+            onItemClick = ::openDetail,
+            onAuthorClick = ::openAuthorProfile
+        )
     }
 
     private fun openDetail(podcast: Podcast) {

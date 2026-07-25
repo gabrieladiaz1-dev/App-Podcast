@@ -1,28 +1,16 @@
 package com.example.audify.ui.adapter
 
-import android.content.Intent
 import android.graphics.Paint
-import android.util.Log
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import coil.transform.CircleCropTransformation
-import com.example.audify.LoginActivity
 import com.example.audify.R
 import com.example.audify.SessionManager
-import com.example.audify.SupabaseService
 import com.example.audify.databinding.ItemPodcastBinding
 import com.example.audify.model.Podcast
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class PodcastAdapter(
     private val items: List<Podcast>,
@@ -30,34 +18,16 @@ class PodcastAdapter(
     private val onFavoriteClick: ((Podcast) -> Unit)? = null,
     private val onAuthorClick: ((Podcast) -> Unit)? = null,
     private val contentTopPaddingDp: Int? = null,
-    private val cardTopMarginDp: Int? = null
+    private val cardTopMarginDp: Int? = null,
+    favoriteIds: Set<String> = emptySet()
 ) : RecyclerView.Adapter<PodcastAdapter.ViewHolder>() {
 
-    private val favoriteIds = mutableSetOf<String>()
-    private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val favoriteIds = favoriteIds.toMutableSet()
 
-    init {
-        loadFavorites()
-    }
-
-    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
-        super.onDetachedFromRecyclerView(recyclerView)
-        adapterScope.coroutineContext[Job]?.cancelChildren()
-    }
-
-    private fun loadFavorites() {
-        val userId = SessionManager.getUserId() ?: return
-        adapterScope.launch {
-            val ids = withContext(Dispatchers.IO) {
-                items.mapNotNull { podcast ->
-                    try {
-                        if (SupabaseService.isFavorited(userId, podcast.supabaseId)) podcast.supabaseId else null
-                    } catch (_: Exception) { null }
-                }.toSet()
-            }
-            favoriteIds.addAll(ids)
-            notifyDataSetChanged()
-        }
+    fun updateFavoriteIds(ids: Set<String>) {
+        favoriteIds.clear()
+        favoriteIds.addAll(ids)
+        notifyDataSetChanged()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -151,62 +121,16 @@ class PodcastAdapter(
                 binding.tvDuration.visibility = android.view.View.GONE
             }
 
-            if (SessionManager.isLoggedIn()) {
-                val isFav = favoriteIds.contains(podcast.supabaseId)
-                binding.btnFavorite.setImageResource(
-                    if (isFav) R.drawable.ic_favorite
-                    else R.drawable.ic_favorite_border
-                )
-                binding.btnFavorite.setOnClickListener {
-                    val userId = SessionManager.getUserId() ?: return@setOnClickListener
-                    val podcastIdStr = podcast.supabaseId
-                    binding.btnFavorite.isEnabled = false
-                    adapterScope.launch {
-                        val currentlyFav = withContext(Dispatchers.IO) {
-                            SupabaseService.isFavorited(userId, podcastIdStr)
-                        }
-                        val result = withContext(Dispatchers.IO) {
-                            if (currentlyFav) {
-                                SupabaseService.removeFavorite(userId, podcastIdStr)
-                            } else {
-                                SupabaseService.addFavorite(userId, podcastIdStr)
-                            }
-                        }
-                        binding.btnFavorite.isEnabled = true
-                        if (result.isSuccess) {
-                            if (currentlyFav) {
-                                favoriteIds.remove(podcastIdStr)
-                                binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
-                            } else {
-                                favoriteIds.add(podcastIdStr)
-                                binding.btnFavorite.setImageResource(R.drawable.ic_favorite)
-                            }
-                        } else {
-                            val err = result.exceptionOrNull()
-                            if (err is SupabaseService.SessionExpiredException) {
-                                Toast.makeText(
-                                    binding.root.context,
-                                    "Tu sesión expiró. Inicia sesión de nuevo.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } else {
-                                Log.e("PodcastAdapter", "Error favorito: ${err?.message}", err)
-                                Toast.makeText(
-                                    binding.root.context,
-                                    "No pudimos actualizar el favorito. Intenta de nuevo",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    }
+            binding.btnFavorite.setImageResource(
+                if (favoriteIds.contains(podcast.supabaseId)) R.drawable.ic_favorite
+                else R.drawable.ic_favorite_border
+            )
+            binding.btnFavorite.setOnClickListener {
+                if (SessionManager.isLoggedIn()) {
                     onFavoriteClick?.invoke(podcast)
-                }
-            } else {
-                binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
-                binding.btnFavorite.alpha = 0.4f
-                binding.btnFavorite.setOnClickListener {
-                    Toast.makeText(binding.root.context, "Ingresa para guardar favoritos", Toast.LENGTH_SHORT).show()
-                    binding.root.context.startActivity(Intent(binding.root.context, LoginActivity::class.java))
+                } else {
+                    binding.btnFavorite.setImageResource(R.drawable.ic_favorite_border)
+                    binding.btnFavorite.alpha = 0.4f
                 }
             }
 

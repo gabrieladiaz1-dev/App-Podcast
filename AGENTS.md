@@ -4,7 +4,10 @@
 - **App:** "Audify" — podcast player for Android
 - **Language:** Kotlin, minSdk 24, targetSdk 36, compileSdk 36
 - **Build:** Gradle Kotlin DSL, AGP 9.1.1, version catalog `gradle/libs.versions.toml`
-- **No DI, no ViewModels, no Jetpack Compose** — XML layouts + ViewBinding, logic in Activities/Fragments, `SupabaseService` singleton for data
+- **No DI, no Jetpack Compose** — XML layouts + ViewBinding, basic MVVM with `ViewModel` + `StateFlow`, `SupabaseService` singleton for data
+- **ViewModels** in `viewmodel/` package (one per Fragment): `InicioViewModel`, `PodcastsViewModel`, `FavoritesViewModel`, `DetailViewModel`, `ListsViewModel`, `ProfileViewModel`, `UserProfileViewModel`, `UploadViewModel`, `DraftsViewModel`
+- **Fragments observe** ViewModel state via `flowWithLifecycle()` — no direct `SupabaseService` calls in Fragments
+- **`PodcastAdapter`** receives `favoriteIds: Set<String>` instead of querying Supabase internally
 - **All UI strings are in Spanish** (`res/values/strings.xml`)
 
 ## Entrypoints & navigation
@@ -25,6 +28,9 @@
 No real tests exist (only auto-generated stubs). No lint/typecheck configured.
 
 ## Architecture
+
+### MVVM pattern
+Each Fragment has a corresponding ViewModel in `viewmodel/` that exposes state via `StateFlow<UiState>`. Fragments collect state using `flowWithLifecycle()` and forward user actions to the ViewModel. No direct `SupabaseService` calls in Fragments.
 
 ### Audio playback & sensors
 - **`AudioForegroundService`** — `Service` foreground type `mediaPlayback`, owns `MediaPlayer`. Started via `startForegroundService()` + `bindService()` with `LocalBinder`.
@@ -57,7 +63,7 @@ No real tests exist (only auto-generated stubs). No lint/typecheck configured.
 - **SupabaseService internal**: `PodcastSupabase` (String id, Jackson-annotated for `postgrest["podcasts"]` decoding).
 - Podcast ID mapping: `podcastId.hashCode()` to convert String → Int for local model. `getPodcastByIntId(podcastId: Int)` uses this.
 
-### Upload flow (UploadFragment, ~689 lines)
+### Upload flow (UploadFragment + UploadViewModel)
 - Supports: image selection (Coil preview), audio file selection, audio recording (with device microphone), category picker, draft save/load
 - Drafts auto-saved to `DraftsManager`, loaded on back navigation via `draftId` argument
 - Resolves `content://` URIs to bytes via `SupabaseService.readUriToBytes()`
@@ -66,14 +72,14 @@ No real tests exist (only auto-generated stubs). No lint/typecheck configured.
 
 ## Key conventions
 - **ViewBinding** enabled — use `XxxBinding.inflate()` / `ActivityXxxBinding.inflate()`
-- **lifecycleScope.launch** for coroutines in Activities/Fragments
+- **viewModelScope.launch** for coroutines in ViewModels; Fragments use `flowWithLifecycle()` to observe state
 - **No explicit nav actions** — nav graph only defines destinations; navigate by ID: `findNavController(view).navigate(R.id.destId)`
 - Drawer header views: `binding.navigationView.getHeaderView(0).findViewById<TextView>(R.id.txtDrawerXxx)`
 - Password visibility toggle uses `PasswordTransformationMethod.getInstance()`
 - All drawable backgrounds are custom XML shapes under `res/drawable/bg_*`
 - **Coil** for image loading (cover images, profile avatars)
-- **`PodcastAdapter`** accepts `onItemClick`, `onFavoriteClick`, and `onAuthorClick` lambdas. Author name is clickable (underlined) when `onAuthorClick` is provided.
-- **InicioFragment** supports text search (`edtBuscar`) and category filter dialog (`btnFiltro`), both applied via `applyFilters()`.
+- **`PodcastAdapter`** accepts `onItemClick`, `onFavoriteClick`, `onAuthorClick`, and `favoriteIds: Set<String>` parameters. Favorite toggling delegated to ViewModel via `onFavoriteClick`. Author name is clickable (underlined) when `onAuthorClick` is provided.
+- **InicioFragment** delegates search/filter to `InicioViewModel` via `setSearchQuery()`/`setSelectedCategory()`.
 - **SwipeRefreshLayout** on podcast lists (InicioFragment, PodcastsFragment)
 - **SDP/SSP** for responsive sizing (`libs.sdp.android`, `libs.ssp.android`)
 - `network_security_config.xml` allows cleartext for `10.0.2.2` (dev) and Supabase

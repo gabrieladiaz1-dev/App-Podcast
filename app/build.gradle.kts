@@ -56,8 +56,9 @@ dependencies {
     implementation(libs.ktor.android)
     implementation(libs.ktor.okhttp)
 
-    // Coroutines
+    // Coroutines + ViewModel
     implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.coroutines.android)
 
     // Navigation

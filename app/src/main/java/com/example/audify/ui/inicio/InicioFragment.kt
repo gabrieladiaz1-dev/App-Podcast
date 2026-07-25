@@ -11,23 +11,24 @@ import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.audify.R
-import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentInicioBinding
 import com.example.audify.model.Podcast
 import com.example.audify.ui.adapter.PodcastAdapter
+import com.example.audify.viewmodel.InicioViewModel
 import kotlinx.coroutines.launch
 
 class InicioFragment : Fragment() {
 
     private var _binding: FragmentInicioBinding? = null
     private val binding get() = _binding!!
-    private var allPodcasts: List<Podcast> = emptyList()
-    private var searchQuery: String = ""
-    private var selectedCategory: String? = null
+    private val viewModel: InicioViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -48,100 +49,72 @@ class InicioFragment : Fragment() {
 
         binding.rvPodcasts.layoutManager = LinearLayoutManager(requireContext())
         binding.swipeLayout.setOnRefreshListener {
-            loadPodcasts(fromSwipeRefresh = true)
+            viewModel.loadPodcasts(fromSwipeRefresh = true)
         }
         binding.edtBuscar.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-
             override fun afterTextChanged(s: Editable?) {
-                searchQuery = s?.toString()?.trim().orEmpty()
-                applyFilters()
+                viewModel.setSearchQuery(s?.toString()?.trim().orEmpty())
             }
         })
         binding.btnFiltro.setOnClickListener {
             showCategoryFilterDialog()
         }
 
-        loadPodcasts(fromSwipeRefresh = false)
-    }
-
-    private fun loadPodcasts(fromSwipeRefresh: Boolean) {
-        if (_binding == null) return
-        if (fromSwipeRefresh) {
-            binding.progressBar.visibility = View.GONE
-            binding.swipeLayout.isRefreshing = true
-        } else {
-            binding.swipeLayout.isRefreshing = false
-            setInitialLoading(true)
-        }
         viewLifecycleOwner.lifecycleScope.launch {
-            val result = SupabaseService.getAllPodcasts()
-            if (_binding == null) return@launch
-            binding.swipeLayout.isRefreshing = false
-            if (!fromSwipeRefresh) {
-                setInitialLoading(false)
-            }
-            if (result.isSuccess) {
-                allPodcasts = result.getOrNull() ?: emptyList()
-                applyFilters()
-            } else {
-                Toast.makeText(requireContext(), "No pudimos cargar los podcasts", Toast.LENGTH_SHORT).show()
-                allPodcasts = emptyList()
-                applyFilters()
-            }
+            viewModel.uiState
+                .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+                .collect { state ->
+                    if (_binding == null) return@collect
+                    bindState(state)
+                }
         }
+
+        viewModel.loadPodcasts()
     }
 
-    private fun setInitialLoading(loading: Boolean) {
-        if (_binding == null) return
-        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
-        val contentVisibility = if (loading) View.INVISIBLE else View.VISIBLE
-        binding.edtBuscar.visibility = contentVisibility
-        binding.cardBanner.visibility = contentVisibility
-        binding.layoutDestacadosHeader.visibility = contentVisibility
-        binding.swipeLayout.visibility = contentVisibility
-    }
-
-    private fun applyFilters() {
-        if (_binding == null) return
-        val filtered = allPodcasts.filter { podcast ->
-            val matchesQuery = searchQuery.isBlank() ||
-                podcast.title.contains(searchQuery, ignoreCase = true) ||
-                podcast.author.contains(searchQuery, ignoreCase = true) ||
-                podcast.description.contains(searchQuery, ignoreCase = true) ||
-                podcast.category.contains(searchQuery, ignoreCase = true)
-            val matchesCategory = selectedCategory.isNullOrBlank() || podcast.category == selectedCategory
-            matchesQuery && matchesCategory
+    private fun bindState(state: com.example.audify.viewmodel.InicioUiState) {
+        binding.swipeLayout.isRefreshing = state.isRefreshing
+        if (state.isLoading && !state.isRefreshing) {
+            binding.progressBar.visibility = View.VISIBLE
+            binding.edtBuscar.visibility = View.INVISIBLE
+            binding.cardBanner.visibility = View.INVISIBLE
+            binding.layoutDestacadosHeader.visibility = View.INVISIBLE
+            binding.swipeLayout.visibility = View.INVISIBLE
+        } else {
+            binding.progressBar.visibility = View.GONE
+            binding.edtBuscar.visibility = View.VISIBLE
+            binding.cardBanner.visibility = View.VISIBLE
+            binding.layoutDestacadosHeader.visibility = View.VISIBLE
+            binding.swipeLayout.visibility = View.VISIBLE
         }
+
         binding.rvPodcasts.adapter = PodcastAdapter(
-            filtered,
+            state.filteredPodcasts,
             onItemClick = ::openDetail,
-            onAuthorClick = ::openAuthorProfile
+            onFavoriteClick = { podcast -> viewModel.toggleFavorite(podcast.supabaseId) },
+            onAuthorClick = ::openAuthorProfile,
+            favoriteIds = state.favoriteIds
         )
     }
 
     private fun showCategoryFilterDialog() {
-        val categories = allPodcasts.map { it.category.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-            .sorted()
-
+        val categories = viewModel.getCategories()
         if (categories.isEmpty()) {
             Toast.makeText(requireContext(), "Aún no hay categorías disponibles", Toast.LENGTH_SHORT).show()
             return
         }
-
+        val currentCategory = viewModel.uiState.value.selectedCategory
         val options = arrayOf("Todas las categorías", *categories.toTypedArray())
-        val selectedIndex = selectedCategory?.let { category ->
-            categories.indexOf(category).takeIf { it >= 0 }?.plus(1)
+        val selectedIndex = currentCategory?.let { cat ->
+            categories.indexOf(cat).takeIf { it >= 0 }?.plus(1)
         } ?: 0
 
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.filter_title)
             .setSingleChoiceItems(options, selectedIndex) { dialog, which ->
-                selectedCategory = if (which == 0) null else categories[which - 1]
-                applyFilters()
+                viewModel.setSelectedCategory(if (which == 0) null else categories[which - 1])
                 dialog.dismiss()
             }
             .setNegativeButton("Cerrar", null)
