@@ -39,14 +39,10 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <ImageButton
+        <View
             android:id="@+id/btnNotificacion"
             android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/notification_desc"
-            android:scaleType="center"
-            android:src="@drawable/ic_notification" />
+            android:layout_height="48dp" />
     </LinearLayout>
 
     <!-- Profile section (horizontal: avatar left, info right) -->
@@ -176,10 +172,11 @@
     </LinearLayout>
 
     <!-- Content on white area (below the gentle arc) -->
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@android:color/white"
+        android:fillViewport="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/layoutProfile"
@@ -259,6 +256,6 @@
                 android:visibility="gone" />
 
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

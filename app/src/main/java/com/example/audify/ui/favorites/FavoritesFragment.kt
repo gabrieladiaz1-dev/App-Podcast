@@ -52,9 +52,6 @@ class FavoritesFragment : Fragment() {
             val drawer = requireActivity().findViewById<DrawerLayout>(R.id.drawerLayout)
             drawer.openDrawer(GravityCompat.START)
         }
-        binding.btnNotificacion.setOnClickListener {
-            Toast.makeText(requireContext(), R.string.notif_coming_soon, Toast.LENGTH_SHORT).show()
-        }
         setupSearch()
         loadFavorites()
     }

@@ -11,13 +11,17 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.audify.LoginActivity
 import com.example.audify.R
 import com.example.audify.SessionManager
 import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentPodcastsBinding
 import com.example.audify.model.Podcast
+import com.example.audify.ui.adapter.CategoryAdapter
+import com.example.audify.ui.adapter.CategoryUiItem
 import com.example.audify.ui.adapter.PodcastAdapter
 import kotlinx.coroutines.launch
 
@@ -25,6 +29,25 @@ class PodcastsFragment : Fragment() {
 
     private var _binding: FragmentPodcastsBinding? = null
     private val binding get() = _binding!!
+    private var allPodcasts: List<Podcast> = emptyList()
+    private var selectedCategory: String? = null
+    private var selectedStatus: StatusFilter = StatusFilter.ALL
+
+    private enum class StatusFilter {
+        ALL, APPROVED, PENDING
+    }
+
+    private class NonScrollableLinearLayoutManager(context: android.content.Context) : LinearLayoutManager(context) {
+        override fun canScrollVertically(): Boolean = false
+
+        override fun onLayoutChildren(recycler: RecyclerView.Recycler?, state: RecyclerView.State?) {
+            try {
+                super.onLayoutChildren(recycler, state)
+            } catch (_: IndexOutOfBoundsException) {
+                // Defensive guard for transient adapter updates during nested measurement.
+            }
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -48,12 +71,19 @@ class PodcastsFragment : Fragment() {
             val drawer = requireActivity().findViewById<DrawerLayout>(R.id.drawerLayout)
             drawer.openDrawer(GravityCompat.START)
         }
-        binding.btnNotificacion.setOnClickListener {
-            Toast.makeText(requireContext(), R.string.notif_coming_soon, Toast.LENGTH_SHORT).show()
-        }
 
         loadProfile()
         loadUserPodcasts()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Always return to unfiltered state when entering this screen.
+        if (selectedStatus != StatusFilter.ALL || !selectedCategory.isNullOrBlank()) {
+            selectedStatus = StatusFilter.ALL
+            selectedCategory = null
+            renderCategoryFiltersAndList()
+        }
     }
 
     private fun loadProfile() {
@@ -74,33 +104,116 @@ class PodcastsFragment : Fragment() {
         lifecycleScope.launch {
             val result = SupabaseService.getUserPodcasts()
             if (result.isSuccess) {
-                val podcasts = result.getOrNull() ?: emptyList()
-                val approved = podcasts.count { it.approved }
-                val pending = podcasts.size - approved
-                val categories = podcasts.map { it.category.trim() }
-                    .filter { it.isNotBlank() }
-                    .distinct()
-                binding.txtPodcastCount.text = podcasts.size.toString()
+                allPodcasts = result.getOrNull() ?: emptyList()
+                selectedStatus = StatusFilter.ALL
+                selectedCategory = null
+                val approved = allPodcasts.count { it.approved }
+                val pending = allPodcasts.size - approved
+                binding.txtPodcastCount.text = allPodcasts.size.toString()
                 binding.txtCategoryCount.text = "$approved aprobados · $pending pendiente${if (pending != 1) "s" else ""}"
-                binding.txtSectionTitle.text = "Mis podcasts (${podcasts.size})"
-                binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
-                binding.rvUserPodcasts.adapter = PodcastAdapter(
-                    podcasts,
-                    onItemClick = ::openDetail,
-                    onAuthorClick = ::openAuthorProfile
-                )
-                binding.txtEmptyPodcasts.visibility = if (podcasts.isEmpty()) View.VISIBLE else View.GONE
-                binding.txtEmptyCategories.visibility = if (categories.isEmpty()) View.VISIBLE else View.GONE
+                renderCategoryFiltersAndList()
             } else {
+                allPodcasts = emptyList()
+                selectedStatus = StatusFilter.ALL
+                selectedCategory = null
                 binding.txtPodcastCount.text = "0"
                 binding.txtCategoryCount.text = "0"
                 binding.txtSectionTitle.text = "Mis podcasts (0)"
-                binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
-                binding.rvUserPodcasts.adapter = PodcastAdapter(emptyList(), onItemClick = ::openDetail)
-                binding.txtEmptyPodcasts.visibility = View.VISIBLE
-                binding.txtEmptyCategories.visibility = View.VISIBLE
+                renderCategoryFiltersAndList()
             }
         }
+    }
+
+    private fun renderCategoryFiltersAndList() {
+        val approvedCount = allPodcasts.count { it.approved }
+        val pendingCount = allPodcasts.size - approvedCount
+
+        if (selectedCategory != null) {
+            val categoryStillExists = allPodcasts.any { podcast ->
+                podcast.category.trim().equals(selectedCategory, ignoreCase = false)
+            }
+            if (!categoryStillExists) selectedCategory = null
+        }
+
+        val statusFiltered = when (selectedStatus) {
+            StatusFilter.ALL -> allPodcasts
+            StatusFilter.APPROVED -> allPodcasts.filter { it.approved }
+            StatusFilter.PENDING -> allPodcasts.filter { !it.approved }
+        }
+
+        val categoryNames = statusFiltered.map { it.category.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+
+        val categoryCards = mutableListOf(
+            CategoryUiItem("status_all", "Todos", allPodcasts.size),
+            CategoryUiItem("status_approved", "Aprobados", approvedCount),
+            CategoryUiItem("status_pending", "En revision", pendingCount)
+        )
+
+        categoryCards.addAll(
+            categoryNames.map { categoryName ->
+                val count = statusFiltered.count { it.category.trim() == categoryName }
+                CategoryUiItem("cat_$categoryName", categoryName, count)
+            }
+        )
+
+        val selectedKey = when (selectedStatus) {
+            StatusFilter.ALL -> "status_all"
+            StatusFilter.APPROVED -> "status_approved"
+            StatusFilter.PENDING -> "status_pending"
+        }.takeIf { selectedCategory == null } ?: "cat_${selectedCategory.orEmpty()}"
+
+        if (binding.rvCategories.layoutManager == null) {
+            binding.rvCategories.layoutManager = GridLayoutManager(requireContext(), 2)
+        }
+        binding.rvCategories.adapter = CategoryAdapter(
+            categoryCards,
+            selectedKey = selectedKey,
+            onCategoryClick = { item ->
+                when (item.key) {
+                    "status_all" -> {
+                        selectedStatus = StatusFilter.ALL
+                        selectedCategory = null
+                    }
+                    "status_approved" -> {
+                        selectedStatus = StatusFilter.APPROVED
+                        selectedCategory = null
+                    }
+                    "status_pending" -> {
+                        selectedStatus = StatusFilter.PENDING
+                        selectedCategory = null
+                    }
+                    else -> {
+                        val category = item.title
+                        selectedCategory = if (selectedCategory == category) null else category
+                    }
+                }
+                renderCategoryFiltersAndList()
+            }
+        )
+
+        val visiblePodcasts = statusFiltered.filter { podcast ->
+            selectedCategory.isNullOrBlank() || podcast.category.trim() == selectedCategory
+        }
+
+        binding.txtSectionTitle.text = "Mis podcasts (${visiblePodcasts.size})"
+        if (binding.rvUserPodcasts.layoutManager == null) {
+            binding.rvUserPodcasts.layoutManager = NonScrollableLinearLayoutManager(requireContext())
+        }
+        binding.rvUserPodcasts.isNestedScrollingEnabled = false
+        binding.rvUserPodcasts.adapter = PodcastAdapter(
+            visiblePodcasts,
+            onItemClick = ::openDetail,
+            onAuthorClick = ::openAuthorProfile,
+            contentTopPaddingDp = 0,
+            cardTopMarginDp = 2
+        )
+        binding.rvUserPodcasts.post { binding.rvUserPodcasts.requestLayout() }
+
+        binding.txtEmptyCategories.visibility = if (allPodcasts.isEmpty()) View.VISIBLE else View.GONE
+        binding.txtEmptyPodcasts.visibility = if (visiblePodcasts.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun openDetail(podcast: Podcast) {

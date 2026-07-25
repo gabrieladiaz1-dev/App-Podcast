@@ -3,6 +3,7 @@ package com.example.audify.ui.adapter
 import android.content.Intent
 import android.graphics.Paint
 import android.util.Log
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.Toast
@@ -27,7 +28,9 @@ class PodcastAdapter(
     private val items: List<Podcast>,
     private val onItemClick: ((Podcast) -> Unit)? = null,
     private val onFavoriteClick: ((Podcast) -> Unit)? = null,
-    private val onAuthorClick: ((Podcast) -> Unit)? = null
+    private val onAuthorClick: ((Podcast) -> Unit)? = null,
+    private val contentTopPaddingDp: Int? = null,
+    private val cardTopMarginDp: Int? = null
 ) : RecyclerView.Adapter<PodcastAdapter.ViewHolder>() {
 
     private val favoriteIds = mutableSetOf<String>()
@@ -69,7 +72,42 @@ class PodcastAdapter(
     override fun getItemCount() = items.size
 
     inner class ViewHolder(private val binding: ItemPodcastBinding) : RecyclerView.ViewHolder(binding.root) {
+        private val basePaddingStart = binding.contentContainer.paddingStart
+        private val basePaddingTop = binding.contentContainer.paddingTop
+        private val basePaddingEnd = binding.contentContainer.paddingEnd
+        private val basePaddingBottom = binding.contentContainer.paddingBottom
+        private val baseCardTopMargin = (binding.root.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0
+
         fun bind(podcast: Podcast) {
+            val resolvedTopPadding = contentTopPaddingDp?.let { dp ->
+                TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    dp.toFloat(),
+                    binding.root.resources.displayMetrics
+                ).toInt()
+            } ?: basePaddingTop
+            binding.contentContainer.setPaddingRelative(
+                basePaddingStart,
+                resolvedTopPadding,
+                basePaddingEnd,
+                basePaddingBottom
+            )
+
+            val params = binding.root.layoutParams as? ViewGroup.MarginLayoutParams
+            if (params != null) {
+                val resolvedTopMargin = cardTopMarginDp?.let { dp ->
+                    TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP,
+                        dp.toFloat(),
+                        binding.root.resources.displayMetrics
+                    ).toInt()
+                } ?: baseCardTopMargin
+                if (params.topMargin != resolvedTopMargin) {
+                    params.topMargin = resolvedTopMargin
+                    binding.root.layoutParams = params
+                }
+            }
+
             binding.tvTitle.text = podcast.title
             binding.tvAuthor.text = podcast.author
             binding.tvDescription.text = podcast.description

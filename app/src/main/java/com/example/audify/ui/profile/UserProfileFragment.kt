@@ -8,11 +8,16 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.example.audify.R
 import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentUserProfileBinding
+import com.example.audify.model.Podcast
+import com.example.audify.ui.adapter.CategoryAdapter
+import com.example.audify.ui.adapter.CategoryUiItem
 import com.example.audify.ui.adapter.PodcastAdapter
 import kotlinx.coroutines.launch
 
@@ -20,6 +25,20 @@ class UserProfileFragment : Fragment() {
 
     private var _binding: FragmentUserProfileBinding? = null
     private val binding get() = _binding!!
+    private var allPodcasts: List<Podcast> = emptyList()
+    private var selectedCategory: String? = null
+
+    private class NonScrollableLinearLayoutManager(context: android.content.Context) : LinearLayoutManager(context) {
+        override fun canScrollVertically(): Boolean = false
+
+        override fun onLayoutChildren(recycler: RecyclerView.Recycler?, state: RecyclerView.State?) {
+            try {
+                super.onLayoutChildren(recycler, state)
+            } catch (_: IndexOutOfBoundsException) {
+                // Defensive guard for transient adapter updates during nested measurement.
+            }
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -69,30 +88,72 @@ class UserProfileFragment : Fragment() {
             binding.txtNombre.text = displayName
 
             val podcastsResult = SupabaseService.getPodcastsByUser(userId)
-            val podcasts = if (podcastsResult.isSuccess) podcastsResult.getOrNull() ?: emptyList() else emptyList()
-            val categories = podcasts.map { it.category.trim() }
-                .filter { it.isNotBlank() }
-                .distinct()
-            binding.txtPodcastCount.text = podcasts.size.toString()
-            binding.txtSectionTitle.text = "Podcasts (${podcasts.size})"
-            binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
-            binding.rvUserPodcasts.adapter = PodcastAdapter(
-                podcasts,
-                onItemClick = ::openDetail,
-                onAuthorClick = ::openAuthorProfile
-            )
-            binding.txtEmptyCategories.visibility = if (categories.isEmpty()) View.VISIBLE else View.GONE
+            allPodcasts = if (podcastsResult.isSuccess) podcastsResult.getOrNull() ?: emptyList() else emptyList()
+            selectedCategory = null
+            binding.txtPodcastCount.text = allPodcasts.size.toString()
+            renderCategoryFiltersAndList()
 
-            if (profile == null && podcasts.isEmpty()) {
+            if (profile == null && allPodcasts.isEmpty()) {
                 Toast.makeText(requireContext(), "No encontramos a ese usuario", Toast.LENGTH_SHORT).show()
             }
-
-            if (podcasts.isEmpty()) {
-                binding.txtEmpty.visibility = View.VISIBLE
-            } else {
-                binding.txtEmpty.visibility = View.GONE
-            }
         }
+    }
+
+    private fun renderCategoryFiltersAndList() {
+        if (selectedCategory != null) {
+            val exists = allPodcasts.any { it.category.trim() == selectedCategory }
+            if (!exists) selectedCategory = null
+        }
+
+        val categoryNames = allPodcasts.map { it.category.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+
+        val categoryCards = mutableListOf(
+            CategoryUiItem("all", "Todos", allPodcasts.size)
+        )
+        categoryCards.addAll(
+            categoryNames.map { categoryName ->
+                val count = allPodcasts.count { it.category.trim() == categoryName }
+                CategoryUiItem("cat_$categoryName", categoryName, count)
+            }
+        )
+
+        val selectedKey = selectedCategory?.let { "cat_$it" } ?: "all"
+        if (binding.rvCategories.layoutManager == null) {
+            binding.rvCategories.layoutManager = GridLayoutManager(requireContext(), 2)
+        }
+        binding.rvCategories.adapter = CategoryAdapter(
+            categoryCards,
+            selectedKey = selectedKey,
+            onCategoryClick = { item ->
+                selectedCategory = when (item.key) {
+                    "all" -> null
+                    else -> if (selectedCategory == item.title) null else item.title
+                }
+                renderCategoryFiltersAndList()
+            }
+        )
+
+        val visiblePodcasts = allPodcasts.filter { podcast ->
+            selectedCategory.isNullOrBlank() || podcast.category.trim() == selectedCategory
+        }
+
+        binding.txtSectionTitle.text = "Podcasts (${visiblePodcasts.size})"
+        if (binding.rvUserPodcasts.layoutManager == null) {
+            binding.rvUserPodcasts.layoutManager = NonScrollableLinearLayoutManager(requireContext())
+        }
+        binding.rvUserPodcasts.isNestedScrollingEnabled = false
+        binding.rvUserPodcasts.adapter = PodcastAdapter(
+            visiblePodcasts,
+            onItemClick = ::openDetail,
+            onAuthorClick = ::openAuthorProfile
+        )
+        binding.rvUserPodcasts.post { binding.rvUserPodcasts.requestLayout() }
+
+        binding.txtEmptyCategories.visibility = if (categoryNames.isEmpty()) View.VISIBLE else View.GONE
+        binding.txtEmpty.visibility = if (visiblePodcasts.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun openDetail(podcast: com.example.audify.model.Podcast) {

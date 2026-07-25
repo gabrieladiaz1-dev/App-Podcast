@@ -64,10 +64,6 @@ class ProfileFragment : Fragment() {
     }
 
     private fun setupClickListeners() {
-        binding.btnNotificacion.setOnClickListener {
-            Toast.makeText(requireContext(), getString(R.string.notif_coming_soon), Toast.LENGTH_SHORT).show()
-        }
-
         binding.btnGuardar.setOnClickListener {
             val name = binding.edtNombre.text.toString().trim()
             val password = binding.edtPassword.text.toString().trim()

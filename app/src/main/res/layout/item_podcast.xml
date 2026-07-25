@@ -13,21 +13,25 @@
     app:cardBackgroundColor="#FFFFFF">
 
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/contentContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="14dp">
+        android:paddingStart="14dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="12dp">
 
         <ImageView
             android:id="@+id/ivThumbnail"
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:background="@drawable/bg_circle_violet"
+            android:contentDescription="@string/thumbnail_desc"
             android:padding="2dp"
             android:src="@drawable/ic_audify_logo"
-            android:contentDescription="@string/thumbnail_desc"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
+            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:id="@+id/tvTitle"
@@ -39,10 +43,10 @@
             android:textColor="#1A1A1A"
             android:textSize="15sp"
             android:textStyle="bold"
-            app:layout_constraintStart_toEndOf="@+id/ivThumbnail"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/ivThumbnail"
             app:layout_constraintBottom_toTopOf="@+id/tvAuthor"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/ivThumbnail"
+            app:layout_constraintTop_toTopOf="@+id/ivThumbnail"
             app:layout_constraintVertical_chainStyle="packed"
             tools:text="Tech Today" />
 
@@ -53,10 +57,10 @@
             android:layout_marginStart="14dp"
             android:textColor="@color/purple"
             android:textSize="13sp"
-            app:layout_constraintStart_toEndOf="@+id/ivThumbnail"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvTitle"
             app:layout_constraintBottom_toTopOf="@+id/tvDescription"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/ivThumbnail"
+            app:layout_constraintTop_toBottomOf="@+id/tvTitle"
             tools:text="John Doe" />
 
         <TextView
@@ -69,10 +73,10 @@
             android:maxLines="2"
             android:textColor="#999999"
             android:textSize="12sp"
-            app:layout_constraintStart_toEndOf="@+id/ivThumbnail"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvAuthor"
             app:layout_constraintBottom_toBottomOf="@+id/ivThumbnail"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/ivThumbnail"
+            app:layout_constraintTop_toBottomOf="@+id/tvAuthor"
             tools:text="Discussions about the latest technology trends and innovations." />
 
         <TextView
@@ -80,9 +84,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:background="@drawable/bg_pill"
             android:paddingHorizontal="10dp"
             android:paddingVertical="4dp"
-            android:background="@drawable/bg_pill"
             android:textColor="@color/purple"
             android:textSize="11sp"
             android:textStyle="bold"
@@ -98,9 +102,9 @@
             android:contentDescription="Favorito"
             android:padding="6dp"
             android:scaleType="center"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
+            app:layout_constraintTop_toTopOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
