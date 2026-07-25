@@ -5,25 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/gradient_bg">
-
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@drawable/bg_header_pattern"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@drawable/bg_curve_content"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+    android:background="@android:color/white">
 
     <LinearLayout
         android:id="@+id/toolbar"
@@ -65,11 +47,12 @@
         android:id="@+id/layoutProfile"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:background="#1E1B4B"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="24dp"
         android:paddingTop="14dp"
-        android:paddingBottom="8dp"
+        android:paddingBottom="16dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/toolbar">
@@ -93,6 +76,14 @@
                 android:textColor="#532680"
                 android:textSize="24sp"
                 android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/imgAvatar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/user_profile_title"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
         </com.google.android.material.card.MaterialCardView>
 
         <LinearLayout
@@ -178,7 +169,7 @@
     <ScrollView
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@android:color/transparent"
+        android:background="@android:color/white"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/layoutProfile"
@@ -207,6 +198,17 @@
                 android:layout_height="wrap_content"
                 android:clipToPadding="false"
                 android:paddingHorizontal="12dp" />
+
+            <TextView
+                android:id="@+id/txtEmptyCategories"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="4dp"
+                android:text="Este usuario aun no tiene categorias"
+                android:textColor="#999999"
+                android:textSize="13sp"
+                android:visibility="gone" />
 
             <View
                 android:layout_width="match_parent"

@@ -46,6 +46,15 @@ on profiles for insert
 with check (auth.uid() = id);
 ```
 
+### RLS Policy for `profiles` SELECT
+The public profile screen reads other users' rows from `profiles`. If `SELECT` is not allowed, the app will fall back to "Desconocido" even when the user exists. Add this as well:
+
+```sql
+create policy "Usuarios pueden ver perfiles"
+on profiles for select
+using (true);
+```
+
 ### Disable Email Confirmation
 Go to **Supabase Dashboard → Authentication → Settings → General** and toggle **"Confirm email" OFF** to allow registration without email verification.
 

@@ -22,7 +22,7 @@
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:background="@drawable/bg_circle_violet"
-            android:padding="14dp"
+            android:padding="2dp"
             android:src="@drawable/ic_audify_logo"
             android:contentDescription="@string/thumbnail_desc"
             app:layout_constraintStart_toStartOf="parent"

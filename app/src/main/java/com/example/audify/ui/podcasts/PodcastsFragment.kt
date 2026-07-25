@@ -77,6 +77,9 @@ class PodcastsFragment : Fragment() {
                 val podcasts = result.getOrNull() ?: emptyList()
                 val approved = podcasts.count { it.approved }
                 val pending = podcasts.size - approved
+                val categories = podcasts.map { it.category.trim() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
                 binding.txtPodcastCount.text = podcasts.size.toString()
                 binding.txtCategoryCount.text = "$approved aprobados · $pending pendiente${if (pending != 1) "s" else ""}"
                 binding.txtSectionTitle.text = "Mis podcasts (${podcasts.size})"
@@ -86,10 +89,16 @@ class PodcastsFragment : Fragment() {
                     onItemClick = ::openDetail,
                     onAuthorClick = ::openAuthorProfile
                 )
+                binding.txtEmptyPodcasts.visibility = if (podcasts.isEmpty()) View.VISIBLE else View.GONE
+                binding.txtEmptyCategories.visibility = if (categories.isEmpty()) View.VISIBLE else View.GONE
             } else {
                 binding.txtPodcastCount.text = "0"
                 binding.txtCategoryCount.text = "0"
                 binding.txtSectionTitle.text = "Mis podcasts (0)"
+                binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
+                binding.rvUserPodcasts.adapter = PodcastAdapter(emptyList(), onItemClick = ::openDetail)
+                binding.txtEmptyPodcasts.visibility = View.VISIBLE
+                binding.txtEmptyCategories.visibility = View.VISIBLE
             }
         }
     }
@@ -101,7 +110,10 @@ class PodcastsFragment : Fragment() {
 
     private fun openAuthorProfile(podcast: Podcast) {
         if (podcast.userId.isBlank()) return
-        val bundle = Bundle().apply { putString("userId", podcast.userId) }
+        val bundle = Bundle().apply {
+            putString("userId", podcast.userId)
+            putString("authorName", podcast.author)
+        }
         Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 

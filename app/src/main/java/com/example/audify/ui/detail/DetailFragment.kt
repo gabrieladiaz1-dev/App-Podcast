@@ -233,7 +233,10 @@ class DetailFragment : Fragment() {
     }
 
     private fun openAuthorProfile(userId: String) {
-        val bundle = Bundle().apply { putString("userId", userId) }
+        val bundle = Bundle().apply {
+            putString("userId", userId)
+            putString("authorName", podcast?.author)
+        }
         androidx.navigation.Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 

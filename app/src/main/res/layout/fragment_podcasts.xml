@@ -5,27 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/gradient_bg">
-
-    <!-- Decorative circles -->
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@drawable/bg_header_pattern"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- White curve overlay (gentle arc) -->
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@drawable/bg_curve_content"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+    android:background="@android:color/white">
 
     <!-- Toolbar -->
     <LinearLayout
@@ -74,11 +54,12 @@
         android:id="@+id/layoutProfile"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:background="#1E1B4B"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="24dp"
         android:paddingTop="14dp"
-        android:paddingBottom="8dp"
+        android:paddingBottom="20dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/toolbar">
@@ -179,7 +160,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         tools:text="6" />
 
@@ -198,7 +179,7 @@
     <ScrollView
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@android:color/transparent"
+        android:background="@android:color/white"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/layoutProfile"
@@ -229,6 +210,17 @@
                 android:clipToPadding="false"
                 android:paddingHorizontal="12dp" />
 
+            <TextView
+                android:id="@+id/txtEmptyCategories"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="4dp"
+                android:text="Aun no hay categorias porque no has creado podcasts"
+                android:textColor="#999999"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
@@ -255,6 +247,16 @@
                 android:clipToPadding="false"
                 android:nestedScrollingEnabled="false"
                 android:paddingBottom="8dp" />
+
+            <TextView
+                android:id="@+id/txtEmptyPodcasts"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:text="Aun no has creado podcasts"
+                android:textColor="#999999"
+                android:textSize="14sp"
+                android:visibility="gone" />
 
         </LinearLayout>
     </ScrollView>

@@ -119,6 +119,7 @@ object SupabaseService {
     data class Profile(
         val id: String = "",
         val name: String = "",
+        val username: String = "",
         val avatar_url: String? = null,
         val created_at: String? = null
     )

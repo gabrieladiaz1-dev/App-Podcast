@@ -115,7 +115,10 @@ class ListsFragment : Fragment() {
 
     private fun openAuthorProfile(podcast: Podcast) {
         if (podcast.userId.isBlank()) return
-        val bundle = Bundle().apply { putString("userId", podcast.userId) }
+        val bundle = Bundle().apply {
+            putString("userId", podcast.userId)
+            putString("authorName", podcast.author)
+        }
         Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 

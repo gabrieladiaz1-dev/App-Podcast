@@ -9,6 +9,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
+import coil.load
 import com.example.audify.R
 import com.example.audify.SupabaseService
 import com.example.audify.databinding.FragmentUserProfileBinding
@@ -37,26 +38,41 @@ class UserProfileFragment : Fragment() {
         }
 
         val userId = arguments?.getString("userId") ?: return
-        loadProfile(userId)
+        val fallbackName = arguments?.getString("authorName")
+        loadProfile(userId, fallbackName)
     }
 
-    private fun loadProfile(userId: String) {
+    private fun loadProfile(userId: String, fallbackName: String? = null) {
         binding.progressBar.visibility = View.VISIBLE
         lifecycleScope.launch {
             val profile = SupabaseService.getProfileByUserId(userId)
             binding.progressBar.visibility = View.GONE
 
-            if (profile == null) {
-                Toast.makeText(requireContext(), "No encontramos a ese usuario", Toast.LENGTH_SHORT).show()
-                return@launch
+            val displayName = profile?.name?.ifEmpty { null }
+                ?: profile?.username?.ifBlank { null }
+                ?: fallbackName?.ifBlank { null }
+                ?: "Usuario"
+            val avatarUrl = profile?.avatar_url
+            if (!avatarUrl.isNullOrBlank()) {
+                binding.imgAvatar.visibility = View.VISIBLE
+                binding.txtAvatar.visibility = View.GONE
+                binding.imgAvatar.load(avatarUrl) {
+                    crossfade(true)
+                    placeholder(R.drawable.bg_circle_violet)
+                    error(R.drawable.bg_circle_violet)
+                }
+            } else {
+                binding.imgAvatar.visibility = View.GONE
+                binding.txtAvatar.visibility = View.VISIBLE
+                binding.txtAvatar.text = displayName.firstOrNull()?.uppercase() ?: "?"
             }
-
-            val displayName = profile.name.ifEmpty { "Usuario" }
-            binding.txtAvatar.text = displayName.firstOrNull()?.uppercase() ?: "?"
             binding.txtNombre.text = displayName
 
             val podcastsResult = SupabaseService.getPodcastsByUser(userId)
             val podcasts = if (podcastsResult.isSuccess) podcastsResult.getOrNull() ?: emptyList() else emptyList()
+            val categories = podcasts.map { it.category.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
             binding.txtPodcastCount.text = podcasts.size.toString()
             binding.txtSectionTitle.text = "Podcasts (${podcasts.size})"
             binding.rvUserPodcasts.layoutManager = LinearLayoutManager(requireContext())
@@ -65,6 +81,11 @@ class UserProfileFragment : Fragment() {
                 onItemClick = ::openDetail,
                 onAuthorClick = ::openAuthorProfile
             )
+            binding.txtEmptyCategories.visibility = if (categories.isEmpty()) View.VISIBLE else View.GONE
+
+            if (profile == null && podcasts.isEmpty()) {
+                Toast.makeText(requireContext(), "No encontramos a ese usuario", Toast.LENGTH_SHORT).show()
+            }
 
             if (podcasts.isEmpty()) {
                 binding.txtEmpty.visibility = View.VISIBLE
@@ -81,7 +102,10 @@ class UserProfileFragment : Fragment() {
 
     private fun openAuthorProfile(podcast: com.example.audify.model.Podcast) {
         if (podcast.userId.isBlank()) return
-        val bundle = Bundle().apply { putString("userId", podcast.userId) }
+        val bundle = Bundle().apply {
+            putString("userId", podcast.userId)
+            putString("authorName", podcast.author)
+        }
         Navigation.findNavController(requireView()).navigate(R.id.userProfileFragment, bundle)
     }
 
